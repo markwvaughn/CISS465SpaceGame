@@ -42,6 +42,7 @@ void server_loop()
 		// RECEIVE DATA FROM CLIENT
 		//-----------------------------------------------------------------------------------------------------------
 
+		//std::cout << "Server waiting to recieve data from client" << std::endl;
 		char data[100];
 		SDLNet_TCP_Recv(server, data, 100);
 
@@ -63,26 +64,32 @@ void server_loop()
 			text = "You Pressed the Down Arrow Key!";
 		}
 		else {
-			text = "You did not press an arrow key.";
+			text = "";
 		}
+
+		if (text > "")
+			std::cout << text << std::endl;
 
 		//-----------------------------------------------------------------------------------------------------------
 		// SEND DATA TO CLIENT
 		//-----------------------------------------------------------------------------------------------------------
+		
+		// std::cout << "Server sending data to client" << std::endl;
+		// while(1)
+		// {
+		// 	if (event.poll() && event.type() == QUIT) break;
 
-		while(1)
-		{
-			client = SDLNet_TCP_Accept(server);
-			if (client)
-			{
-				// here you can communicate with the client
-				SDLNet_TCP_Send(client, text, strlen(text) + 1); // text is a pointer
-				SDLNet_TCP_Close(client);
-				break;
-			}
-		}
+		// 	client = SDLNet_TCP_Accept(server);
+		// 	if (client)
+		// 	{
+		// 		// here you can communicate with the client
+		// 		SDLNet_TCP_Send(client, text, strlen(text) + 1); // text is a pointer
+		// 		SDLNet_TCP_Close(client);
+		// 		break;
+		// 	}
+		// }
 
-		SDLNet_TCP_Close(server); // important! if you don't close you cannot connect to the same port again
+		// SDLNet_TCP_Close(server); // important! if you don't close you cannot connect to the same port again
 
 		delay(10);
 	}

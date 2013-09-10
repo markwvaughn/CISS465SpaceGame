@@ -7,7 +7,7 @@
 #include "SDL_net.h"
 #include <string.h>
 
-//g++ server.cpp `sdl-config --cflags --libs` -lSDL_image -lSDL_mixer -lSDL_ttf -lSDL_net -o server
+// g++ server.cpp `sdl-config --cflags --libs` -lSDL_image -lSDL_mixer -lSDL_ttf -lSDL_net -o server
 // telnet 127.0.0.1 1234 (local client)
 
 int main(int argc, char **argv)

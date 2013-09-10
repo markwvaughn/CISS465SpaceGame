@@ -68,9 +68,16 @@ void game_loop()
 		//-----------------------------------------------------------------------------------------------------------
 		// SEND DATA TO SERVER
 		//-----------------------------------------------------------------------------------------------------------
+		std::cout << "Client sending data to server" << std::endl;
 		while(1)
 		{
+
+			if (event.poll() && event.type() == QUIT) break;
+
+
 			server = SDLNet_TCP_Accept(client);
+			std::cout << server << std::endl;
+			std::cout << client << std::endl;
 			if (server)
 			{
 				// here you can communicate with the server
@@ -83,12 +90,15 @@ void game_loop()
 		SDLNet_TCP_Close(client); // important! if you don't close you cannot connect to the same port again
 
 		//-----------------------------------------------------------------------------------------------------------
-		// Get Data from Silver
+		// Get Data from Server
 		//-----------------------------------------------------------------------------------------------------------
-		data = "";
-		SDLNet_TCP_Recv(server, data, 100);
+		
+		// std::cout << "Client getting data from server" << std::endl;
 
-		std::cout << "Input " << count << ": " << data << std::endl;
+		// data = "";
+		// SDLNet_TCP_Recv(server, data, 100);
+
+		// std::cout << "Input " << count << ": " << data << std::endl;
 
 		delay(10);
 	}
