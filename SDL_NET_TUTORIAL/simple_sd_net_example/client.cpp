@@ -14,8 +14,6 @@ const int H = 400;
 
 void game_loop()
 {
-	Surface surface(W, H);
-	Event event;
 	
 	SDL_Init(SDL_INIT_EVERYTHING);
 	
@@ -35,23 +33,6 @@ void game_loop()
 
 	SDLNet_TCP_Recv(client, data, 100);
 	std::cout << data << std::endl;
-
-
-	//-----------------------------------------------------------------------------------------
-	// GAME LOOP
-	//-----------------------------------------------------------------------------------------
-	while (1)
-	{
-		if (event.poll() && event.type() == QUIT) break;
-
-		surface.lock();
-		surface.put_rect(x, y, w, h, rand() % 256, rand() % 256 , rand() % 256);
-		surface.unlock();
-		surface.flip();
-
-		delay(10);
-	}
-
 
 	SDLNet_TCP_Close(client); // important! if you don't close you cannot connect to the same port again
 	

@@ -14,8 +14,8 @@ int main(int argc, char **argv)
 	char message[1024];
 	int len;
 	
-	IPaddress ip, *remoteip;
-	SDLNet_ResolveHost(&ip, NULL, 1234); // ip of server, NULL if server ip otherwise, port #
+	IPaddress ip;
+	SDLNet_ResolveHost(&ip, NULL, 1235); // ip of server, NULL if server ip otherwise, port #
 
 	/* open the server socket */
 	server=SDLNet_TCP_Open(&ip);
@@ -27,6 +27,11 @@ int main(int argc, char **argv)
 
 	while(1)
 	{
+
+		//-------------------------------------------------------------------------------------------------------------
+		// RECEIVING MESSAGE
+		//-------------------------------------------------------------------------------------------------------------
+
 		/* try to accept a connection */
 		client=SDLNet_TCP_Accept(server);
 		if(!client)
@@ -37,12 +42,12 @@ int main(int argc, char **argv)
 		}
 		
 		/* get the clients IP and port number */
-		remoteip=SDLNet_TCP_GetPeerAddress(client);
-		if(!remoteip)
-		{
-			printf("SDLNet_TCP_GetPeerAddress: %s\n",SDLNet_GetError());
-			continue;
-		}
+		// remoteip=SDLNet_TCP_GetPeerAddress(client);
+		// if(!remoteip)
+		// {
+		// 	printf("SDLNet_TCP_GetPeerAddress: %s\n",SDLNet_GetError());
+		// 	continue;
+		// }
 		
 		/* read the buffer from client */
 		len=SDLNet_TCP_Recv(client,message,1024);
@@ -61,6 +66,21 @@ int main(int argc, char **argv)
 			printf("Quitting on a Q received\n");
 			break;
 		}
+
+		char * ret_message = "Got it.";
+	
+		client=SDLNet_TCP_Accept(server);
+		if(!client)
+		{ /* no connection accepted */
+			/*printf("SDLNet_TCP_Accept: %s\n",SDLNet_GetError()); */
+			SDL_Delay(100); /*sleep 1/10th of a second */
+			continue;
+		}
+		SDLNet_TCP_Send(client,ret_message,strlen(ret_message) + 1);
+		SDLNet_TCP_Close(client);
+		
+
+
 	}
 	
 	/* shutdown SDL_net */

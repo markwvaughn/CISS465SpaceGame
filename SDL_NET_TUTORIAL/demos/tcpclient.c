@@ -18,7 +18,11 @@ int main(int argc, char **argv)
 	int len;
 	
 	IPaddress ip;
-	SDLNet_ResolveHost(&ip, "127.0.0.1", 1234);
+	SDLNet_ResolveHost(&ip, "127.0.0.1", 1235);
+
+	//-------------------------------------------------------------------------------------------------------------
+	// SENDING MESSAGE
+	//-------------------------------------------------------------------------------------------------------------
 
 	/* open the server socket */
 	sock=SDLNet_TCP_Open(&ip);
@@ -49,7 +53,17 @@ int main(int argc, char **argv)
 	}
 
 	SDLNet_TCP_Close(sock);
-	
+
+	//-------------------------------------------------------------------------------------------------------------
+	// RECEIVING MESSAGE
+	//-------------------------------------------------------------------------------------------------------------
+	char * ret_message = "";
+
+	TCPsocket client = SDLNet_TCP_Open(&ip);
+	SDLNet_TCP_Recv(client,ret_message,strlen(ret_message) + 1);
+	SDLNet_TCP_Close(client);
+	printf("Ret Message: %s\n", ret_message);
+
 	/* shutdown SDL_net */
 	SDLNet_Quit();
 
