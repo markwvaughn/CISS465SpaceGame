@@ -10,7 +10,7 @@
 #include "SDL_net.h"
 
 
-typedef char * Buffer;
+typedef char Buffer[1024];
 
 
 int main(int argc, char **argv)
@@ -68,7 +68,6 @@ int main(int argc, char **argv)
 
     // Quit SDL and SDLNet
 	SDLNet_Quit();
-    std::cout << "Here" << std::endl;
 	SDL_Quit();
 
 	return 0;

@@ -10,7 +10,7 @@
 #include "SDL_net.h"
 
 
-typedef char * Buffer;
+typedef char Buffer[1024];
 
 
 int main(int argc, char **argv)
