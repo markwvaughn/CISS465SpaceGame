@@ -1,15 +1,20 @@
-exe:	main.cpp
-	g++ *.cpp src/*.cpp src/*.c `sdl-config --cflags --libs` -lSDL_image -lSDL_mixer -lSDL_ttf -Iincludes 
+all:	server.cpp
+	g++ server.cpp src/*.cpp src/*.c `sdl-config --cflags --libs` -lSDL_image -lSDL_mixer -lSDL_ttf -lSDL_net -Iincludes -o server.exe
+	g++ client.cpp src/*.cpp src/*.c `sdl-config --cflags --libs` -lSDL_image -lSDL_mixer -lSDL_ttf -lSDL_net -Iincludes -o client.exe
 
-run:
-	./a.out
+e:	edit
+edit:	server.cpp client.cpp 
+	xemacs server.cpp &
+	xemacs client.cpp &
 
-r:
-	./a.out
+s:	server
+server:	server.exe
+	./server.exe
 
-clean:
-	rm a.out
+c:	client
+client:	client.exe
+	./client.exe
 
-c:
-	rm a.out
-
+w:	wipe
+wipe:	server.exe client.exe
+	rm server.exe client.exe *~

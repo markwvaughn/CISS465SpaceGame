@@ -15,6 +15,7 @@ This header file also contains some useful inline functions derived from SDL.
 #define INCLUDES_H
 
 #include "SDL.h"
+#include "SDL_net.h"
 #include "Surface.h"
 #include "SingletonSurface.h"
 #include "Event.h"
