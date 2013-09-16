@@ -1197,7 +1197,6 @@ std::string receive_data(TCPsocket & server) {
 	char buffer[100];
 	std::string data;
 	SDLNet_TCP_Recv(server, buffer, 100);
-
 	char buffer2[100];
 	int i = 0;
 	while (buffer[i] != '#') {
@@ -1238,7 +1237,7 @@ void space_game()
 		//--------------------------------------------------------------------------------------
 		KeyPressed keypressed = get_keypressed();
 		
-		to_server = "";
+		to_server = "#";
 		if (keypressed[UPARROW]) {
 			to_server = "1#";
 			std::cout << "up arrow" << std::endl;
@@ -1256,15 +1255,17 @@ void space_game()
 			std::cout << "right arrow" << std::endl;
 		}
 		
-		send_data(to_server, server);
+		if (to_server != "#")
+			send_data(to_server, server);
+			
+		//from_server = receive_data(server);
+		//std::cout << "from server" << from_server << std::endl;
+		
+		
 		//--------------------------------------------------------------------------------------
 		// RECV DATA FROM SERVER
 		//--------------------------------------------------------------------------------------
-		
-		from_server = receive_data(server);
-
-		std::cout << "from server" << from_server << std::endl;
-		break;
+		//break;
 		
 		// parse data from server
 		//parse_packet(from_server, player.x, player.y);

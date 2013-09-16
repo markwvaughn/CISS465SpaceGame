@@ -37,8 +37,6 @@ std::string receive_data(TCPsocket & client) {
 		i++;
 	}
 
-	std::cout << buffer2 << std::endl;
-
 	data.assign(buffer2, strlen(buffer2) + 1);
 
 	return data;
@@ -67,7 +65,6 @@ int main(int argc, char **argv)
 		// loop over clients
 		if (client)
 		{
-
 			//--------------------------------------------------------------------------------------
 			// RECV DATA FROM CLIENT
 			//--------------------------------------------------------------------------------------
@@ -111,10 +108,7 @@ int main(int argc, char **argv)
             //--------------------------------------------------------------------------------------
 			// SEND DATA TO CLIENT
 			//--------------------------------------------------------------------------------------
-           	send_data(to_client, client);
-            break;
-
-            SDLNet_TCP_Close(client);
+           	//send_data(to_client, client);
 		}
 	}
 

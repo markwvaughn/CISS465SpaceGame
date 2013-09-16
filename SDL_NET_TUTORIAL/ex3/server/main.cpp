@@ -1,51 +1,75 @@
-#include <string.h>
-#include <stdarg.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include "SDL.h"
-#include "SDL_net.h"
-#include "util.h"
+/**
+ * This is a very simple example with SDL_net. There is no error checking atm.
+ * Run client.exe or telnet 127.0.0.1 1234 (local client) to test
+ **/
+
 #include <iostream>
+#include <cmath>
+#include <vector>
+#include <string>
+#include <fstream>
+#include <ctime>
+#include <cmath>
+#include <cstdlib>
+#include <sstream>
+#include <string> 
+#include "Includes.h"
+#include "Constants.h"
+#include "compgeom.h"
+#include "Surface.h"
+#include "Event.h"
+#include "SDL_net.h"
 
-#ifdef WIN32
-#define strcasecmp _stricmp
-#define strncasecmp _strnicmp
+// #include <string.h>
+// #include <stdarg.h>
+// #include <stdlib.h>
+// #include <unistd.h>
 
-char *strsep(char **stringp, const char *delim)
-{
-	char *p;
-	
-	if(!stringp)
-		return(NULL);
-	p=*stringp;
-	while(**stringp && !strchr(delim,**stringp))
-		(*stringp)++;
-	if(**stringp)
-	{
-		**stringp='\0';
-		(*stringp)++;
-	}
-	else
-		*stringp=NULL;
-	return(p);
+#include <stdio.h>
+#include <stdlib.h>
+
+const int MAXLEN = 1024;
+
+std::string recv_message(TCPsocket sock) {
+
+    char buff[MAXLEN];
+	SDLNet_TCP_Recv(sock, buff, MAXLEN);
+
+	std::cout << "buffer: " << buff << std::endl;
+	std::cout << "length: " << strlen(buff) << std::endl;
+
+    if (buff == NULL) {
+    	std::string ret = "";
+    	return ret;
+    }
+    std::string ret(buff, MAXLEN);
+    ret = ret.substr(0, strlen(buff));
+    return ret;
 }
 
-#endif
+int send_message(std::string msg, TCPsocket sock) {
 
-typedef struct {
+	char * buff = (char *)msg.c_str();		
+	SDLNet_TCP_Send(sock, buff, MAXLEN);
+
+    return 1;
+}
+
+struct Client {
 	TCPsocket sock;
-	char *name;
-} Client;
+	std::string name;
+	int x, y;
+};
 
 int running=1;
 Client *clients=NULL;
 int num_clients=0;
 TCPsocket server;
 
-void send_all(char *buf);
-int find_client_name(char *name);
+void send_all(std::string buf);
+int find_client_name(std::string name);
 
-char *mformat(char *format,...)
+std::string mformat(char *format,...)
 {
 	va_list ap;
 	Uint32 len=0;
@@ -95,48 +119,45 @@ char *mformat(char *format,...)
 			len=0;
 	}
 	va_end(ap);
-	return(str);
-}
 
-/* terminate the nick at "bad" characters... */
-void fix_nick(char *s)
-{
-	unsigned int i;
+	std::string ret(str);
 
-	if((i=strspn(s,"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ|_=+.,:;/\\?!@#$%^&*()~`"))!=strlen(s))
-		s[i]='\0';
+	return ret;
 }
 
 /* test for nice name uniqueness among already connected users */
-int unique_nick(char *s)
+int unique_nick(std::string s)
 {
 	return(find_client_name(s)==-1);
 }
 
 /* add a client into our array of clients */
-Client *add_client(TCPsocket sock, char *name)
+Client *add_client(TCPsocket sock, std::string name)
 {
-	fix_nick(name);
-	if(!strlen(name))
+	if(!name.length())
 	{
-		putMsg(sock,"Invalid Nickname...bye bye!");
+		send_message("Invalid Nickname...bye bye!", sock);
 		SDLNet_TCP_Close(sock);
 		return(NULL);
 	}
 	if(!unique_nick(name))
 	{
-		putMsg(sock,"Duplicate Nickname...bye bye!");
+		send_message("Duplicate Nickname...bye bye!", sock);
 		SDLNet_TCP_Close(sock);
 		return(NULL);
 	}
+	
 	clients=(Client*)realloc(clients, (num_clients+1)*sizeof(Client));
 	clients[num_clients].name=name;
 	clients[num_clients].sock=sock;
+	clients[num_clients].x=0;
+	clients[num_clients].y=0;
+
 	num_clients++;
 	/* server side info */
 	std::cout << "--> " << name << std::endl;
 	/* inform all clients, including the new one, of the joined user */
-	send_all(mformat("ss","--> ",name));
+	send_all(mformat("ss","--> ",name.c_str()));
 	return(&clients[num_clients-1]);
 }
 
@@ -153,19 +174,20 @@ int find_client(TCPsocket sock)
 
 /* find a client in our array of clients by it's socket. */
 /* the name is always unique */
-int find_client_name(char *name)
+int find_client_name(std::string name)
 {
-	int i;
-	for(i=0;i<num_clients;i++)
-		if(!strcasecmp(clients[i].name,name))
-			return(i);
-	return(-1);
+	for(int i=0; i < num_clients;i++) {
+		if (clients[i].name == name)
+			return i;
+	}
+		
+	return -1;
 }
 
 /* remove a client from our array of clients */
 void remove_client(int i)
 {
-	char *name=clients[i].name;
+	std::string name=clients[i].name;
 
 	if(i<0 && i>=num_clients)
 		return;
@@ -176,13 +198,15 @@ void remove_client(int i)
 	num_clients--;
 	if(num_clients>i)
 		memmove(&clients[i], &clients[i+1], (num_clients-i)*sizeof(Client));
+	
 	clients=(Client*)realloc(clients, num_clients*sizeof(Client));
+	
 	/* server side info */
 	std::cout << "<-- " << name << std::endl;
 	/* inform all clients, excluding the old one, of the disconnected user */
-	send_all(mformat("ss","<-- ",name));
-	if(name)
-		free(name);
+	
+	send_all(mformat("ss","<-- ",name.c_str()));
+	
 }
 
 /* create a socket set that has the server socket and all the client sockets */
@@ -205,152 +229,50 @@ SDLNet_SocketSet create_sockset()
 }
 
 /* send a buffer to all clients */
-void send_all(char *buf)
+void send_all(std::string buf)
 {
 	int cindex;
 
-	if(!buf || !num_clients)
+	if(buf == "" || !num_clients)
 		return;
 	cindex=0;
 	while(cindex<num_clients)
 	{
 		/* putMsg is in tcputil.h, it sends a buffer over a socket */
 		/* with error checking */
-		if(putMsg(clients[cindex].sock,buf))
+		if(send_message(buf, clients[cindex].sock))
 			cindex++;
 		else
 			remove_client(cindex);
 	}
 }
 
-void do_command(char *msg, Client *client)
-{
-	char *command,*p;
-	int len;
+void who_command(Client *client) {
 
-	if(!msg || !strlen(msg) || !client)
-		return;
-	len=strlen(msg);
-	p=msg;
-	command=strsep(&p," \t");
-	/* /NICK : change the clients name */
-	if(!strcasecmp(command,"NICK"))
+	int i;
+	IPaddress *ipaddr;
+	Uint32 ip;
+	const char *host=NULL;
+	
+	send_message("--- Begin /WHO ", client->sock);
+	for(i=0;i<num_clients;i++)
 	{
-		if(p && strlen(p))
+		ipaddr=SDLNet_TCP_GetPeerAddress(clients[i].sock);
+		if(ipaddr)
 		{
-			char *old_name=client->name;
-			
-			fix_nick(p);
-			if(!strlen(p))
-			{
-				putMsg(client->sock,"--- Invalid Nickname!");
-				return;
-			}
-			if(!unique_nick(p))
-			{
-				putMsg(client->sock,"--- Duplicate Nickname!");
-				return;
-			}
-			client->name=strdup(p);
-			send_all(mformat("ssss","--- ",old_name," --> ",p));
-			free(old_name);
-		}
-		else
-			putMsg(client->sock,"--- /NICK nickname");
-		return;
-	}
-	/* MSG : client to client message */
-	if(!strcasecmp(command,"MSG"))
-	{
-		char *name;
-		int to;
+			std::string info(mformat("sssssdsdsdsdsd","--- ",clients[i].name.c_str(),
+					" ",host?host:"",
+					"[",ip>>24,".", (ip>>16)&0xff,".", (ip>>8)&0xff,".", ip&0xff,
+					"] port ",(Uint32)ipaddr->port));
 
-		if(p)
-		{
-			name=strsep(&p," ");
-			to=find_client_name(name);
-			if(to<0)
-			{
-				putMsg(client->sock, mformat("sss","--- /MSG nickname ",name," not found!"));
-				return;
-			}
-			else if(p && strlen(p))
-			{
-				putMsg(client->sock,mformat("ssss",">",clients[to].name,"< ",p));
-				putMsg(clients[to].sock,mformat("ssss",">",client->name,"< ",p));
-				return;
-			}
+			ip=SDL_SwapBE32(ipaddr->host);
+			host=SDLNet_ResolveIP(ipaddr);
+			send_message(info, client->sock);
 		}
-		putMsg(client->sock,"--- /MSG nickname message...");
-		return;
-	}
-	/* /ME : emote! to everyone */
-	if(!strcasecmp(command,"ME"))
-	{
-		if(p && strlen(p))
-		{
-			send_all(mformat("sss",client->name," ",p));
-		}
-		else
-			putMsg(client->sock,"--- /ME message...");
-		return;
-	}
-	/* /QUIT : quit the server with a message */
-	if(!strcasecmp(command,"QUIT"))
-	{
-		if(!p || strcasecmp(p,"-h"))
-		{
-			if(p)
-				send_all(mformat("ssss","--- ",client->name," quits : ",p));
-			else
-				send_all(mformat("sss","--- ",client->name," quits"));
-			remove_client(find_client(client->sock));
-		}
-		else
-			putMsg(client->sock,"--- /QUIT [message...]");
-		return;
-	}
-	/* /WHO : list the users online back to the client */
-	if(!strcasecmp(command,"WHO"))
-	{
-		int i;
-		IPaddress *ipaddr;
-		Uint32 ip;
-		const char *host=NULL;
-		
-		putMsg(client->sock,"--- Begin /WHO ");
-		for(i=0;i<num_clients;i++)
-		{
-			ipaddr=SDLNet_TCP_GetPeerAddress(clients[i].sock);
-			if(ipaddr)
-			{
-				ip=SDL_SwapBE32(ipaddr->host);
-				host=SDLNet_ResolveIP(ipaddr);
-				putMsg(client->sock,mformat("sssssdsdsdsdsd","--- ",clients[i].name,
-						" ",host?host:"",
-						"[",ip>>24,".", (ip>>16)&0xff,".", (ip>>8)&0xff,".", ip&0xff,
-						"] port ",(Uint32)ipaddr->port));
-			}
-		}
-		putMsg(client->sock,"--- End /WHO");
-		return;
-	}
-	/* /HELP : tell the client all the supported commands */
-	if(!strcasecmp(command,"HELP"))
-	{
-		putMsg(client->sock,"--- Begin /HELP");
-		putMsg(client->sock,"--- /HELP : this text");
-		putMsg(client->sock,"--- /ME message... : emote!");
-		putMsg(client->sock,"--- /MSG nickname message... : personal messaging");
-		putMsg(client->sock,"--- /NICK nickname : change nickaname");
-		putMsg(client->sock,"--- /QUIT [message...] : disconnect this client");
-		putMsg(client->sock,"--- /WHO : list who is logged on");
-		putMsg(client->sock,"--- End /HELP");
-		return;
 	}
 
-	/* invalid command...respond appropriately */
-	putMsg(client->sock,mformat("sss","--- What does the '",command,"' command do?"));
+	send_message("--- End /WHO", client->sock);
+	return;
 }
 
 int main(int argc, char **argv)
@@ -358,11 +280,15 @@ int main(int argc, char **argv)
 	IPaddress ip;
 	TCPsocket sock;
 	SDLNet_SocketSet set;
-	char *message=NULL;
+	
+	std::string message;
+	
 	const char *host=NULL;
 	Uint32 ipaddr;
 	Uint16 port;
 	
+	//int p1x = 0, p1y = 0;
+
 	/* check our commandline */
 	if(argc<2)
 	{
@@ -417,9 +343,15 @@ int main(int argc, char **argv)
 		exit(4);
 	}
 
+	std::cout << "H: " << host << std::endl;
+	std::cout << "S: " << server << std::endl;
+	std::cout << "I: " << ipaddr << std::endl;
+	std::cout << "P: " << port << std::endl;
+
+
 	while(1)
 	{
-		int numready,i;
+		int numready;
 		set=create_sockset();
 		numready=SDLNet_CheckSockets(set, (Uint32)-1);
 		if(numready==-1)
@@ -437,43 +369,62 @@ int main(int argc, char **argv)
 			sock=SDLNet_TCP_Accept(server);
 			if(sock)
 			{
-				char *name=NULL;
+				std::string name;
+				std::cout << sock << std::endl;
+				name = recv_message(sock);
 
-				if(getMsg(sock, &name))
+				if(name > "")
 				{
 					Client *client;
 					client=add_client(sock,name);
 					if(client)
-						do_command("WHO",client);
+						who_command(client);
 				}
 				else
 					SDLNet_TCP_Close(sock);
 			}
 		}
-		for(i=0; numready && i<num_clients; i++)
+		//-------------------------------------------------------------------------------
+		// LOOP THROUGH CLIENTS
+		//-------------------------------------------------------------------------------
+		for(int i=0; numready && i<num_clients; i++)
 		{
 			if(SDLNet_SocketReady(clients[i].sock))
 			{
-				if(getMsg(clients[i].sock, &message))
+				//-----------------------------------------------------------------------
+				// GET DATA FROM CLIENT
+				//-----------------------------------------------------------------------
+				message = "";
+				message = recv_message(clients[i].sock);
+
+				if(message > "")
 				{
-					char *str;
+					std::string str;
 					
 					numready--;
-					printf("<%s> %s\n",clients[i].name,message);
-					/* interpret commands */
-					if(message[0]=='/' && strlen(message)>1)
-					{
-						do_command(message+1,&clients[i]);
+					std::cout << "<" << clients[i].name << ">" << " " << message;
+					
+					// interpret message
+					if (message == "1") {
+
+						clients[i].y--;
 					}
-					else /* it's a regular message */
-					{
-						/* forward message to ALL clients... */
-						str=mformat("ssss","<",clients[i].name,"> ",message);
-						if(str)
-							send_all(str);
+					else if (message == "2") {
+
+						clients[i].y++;
 					}
-					free(message);
-					message=NULL;
+					else if (message == "3") {
+
+						clients[i].x--;
+					}
+					else if (message == "4") {
+
+						clients[i].x++;
+					}
+		
+					str=mformat("cdcdcc",'p',clients[i].x,',',clients[i].y,';','#');
+					if(str > "")
+						send_all(str);				
 				}
 				else
 					remove_client(i);
@@ -489,3 +440,4 @@ int main(int argc, char **argv)
 
 	return(0);
 }
+
