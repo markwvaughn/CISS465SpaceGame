@@ -58,11 +58,11 @@ int send_message(std::string msg, TCPsocket sock) {
 struct Client {
 	TCPsocket sock;
 	std::string name;
-	int x, y;
+	float x, y;
 };
 
 int running=1;
-Client *clients=NULL;
+std::vector<Client> clients;
 int num_clients=0;
 TCPsocket server;
 
@@ -132,41 +132,47 @@ int unique_nick(std::string s)
 }
 
 /* add a client into our array of clients */
-Client *add_client(TCPsocket sock, std::string name)
+void add_client(TCPsocket sock, std::string name)
 {
-	if(!name.length())
-	{
-		send_message("Invalid Nickname...bye bye!", sock);
-		SDLNet_TCP_Close(sock);
-		return(NULL);
-	}
-	if(!unique_nick(name))
-	{
-		send_message("Duplicate Nickname...bye bye!", sock);
-		SDLNet_TCP_Close(sock);
-		return(NULL);
-	}
+	// if(!name.length())
+	// {
+	// 	send_message("Invalid Nickname...bye bye!", sock);
+	// 	SDLNet_TCP_Close(sock);
+	// 	return(NULL);
+	// }
+	// if(!unique_nick(name))
+	// {
+	// 	send_message("Duplicate Nickname...bye bye!", sock);
+	// 	SDLNet_TCP_Close(sock);
+	// 	return(NULL);
+	// }
 	
-	clients=(Client*)realloc(clients, (num_clients+1)*sizeof(Client));
-	clients[num_clients].name=name;
-	clients[num_clients].sock=sock;
-	clients[num_clients].x=0;
-	clients[num_clients].y=0;
+	std::cout << "inside add client" << std::endl;
+	std::cout << "num clients: " << num_clients << std::endl;
+
+	//clients=(Client*)realloc(clients, (num_clients+1)*sizeof(Client));
+	Client c;
+
+	c.name=name;
+	c.sock=sock;
+	c.x=0.0;
+	c.y=0.0;
+
+	clients.push_back(c);
 
 	num_clients++;
+
 	/* server side info */
-	std::cout << "--> " << name << std::endl;
+	//std::cout << "--> " << name << std::endl;
 	/* inform all clients, including the new one, of the joined user */
-	send_all(mformat("ss","--> ",name.c_str()));
-	return(&clients[num_clients-1]);
+	//send_all(mformat("ss","--> ",name.c_str()));
 }
 
 /* find a client in our array of clients by it's socket. */
 /* the socket is always unique */
 int find_client(TCPsocket sock)
 {
-	int i;
-	for(i=0;i<num_clients;i++)
+	for(int i=0;i<num_clients;i++)
 		if(clients[i].sock==sock)
 			return(i);
 	return(-1);
@@ -196,16 +202,13 @@ void remove_client(int i)
 	SDLNet_TCP_Close(clients[i].sock);
 	
 	num_clients--;
-	if(num_clients>i)
-		memmove(&clients[i], &clients[i+1], (num_clients-i)*sizeof(Client));
-	
-	clients=(Client*)realloc(clients, num_clients*sizeof(Client));
+	clients.erase(clients.begin() + i);
 	
 	/* server side info */
 	std::cout << "<-- " << name << std::endl;
 	/* inform all clients, excluding the old one, of the disconnected user */
 	
-	send_all(mformat("ss","<-- ",name.c_str()));
+	//send_all(mformat("ss","<-- ",name.c_str()));
 	
 }
 
@@ -213,7 +216,6 @@ void remove_client(int i)
 SDLNet_SocketSet create_sockset()
 {
 	static SDLNet_SocketSet set=NULL;
-	int i;
 
 	if(set)
 		SDLNet_FreeSocketSet(set);
@@ -223,7 +225,7 @@ SDLNet_SocketSet create_sockset()
 		exit(1); /*most of the time this is a major error, but do what you want. */
 	}
 	SDLNet_TCP_AddSocket(set,server);
-	for(i=0;i<num_clients;i++)
+	for(int i=0;i<num_clients;i++)
 		SDLNet_TCP_AddSocket(set,clients[i].sock);
 	return(set);
 }
@@ -238,8 +240,6 @@ void send_all(std::string buf)
 	cindex=0;
 	while(cindex<num_clients)
 	{
-		/* putMsg is in tcputil.h, it sends a buffer over a socket */
-		/* with error checking */
 		if(send_message(buf, clients[cindex].sock))
 			cindex++;
 		else
@@ -275,6 +275,77 @@ void who_command(Client *client) {
 	return;
 }
 
+std::string ftos(float f) {
+	std::ostringstream buff;
+	buff << f;
+
+	return buff.str();
+}
+
+std::string itos(int i) {
+	std::ostringstream buff;
+	buff << i;
+
+	return buff.str();
+}
+
+std::string update_position(int i, std::string message) {
+
+	// interpret message
+	if (message == "1") {
+
+		clients[i].y -= 0.5f;
+	}
+	else if (message == "2") {
+
+		clients[i].y += 0.5f;
+	}
+	else if (message == "3") {
+
+		clients[i].x -= 0.5f;
+	}
+	else if (message == "4") {
+
+		clients[i].x += 0.5f;
+	}
+
+	std::string str="p";
+	str += ":";
+	str += ftos(clients[i].x);
+	str += ",";
+	str += ftos(clients[i].y);
+	str += ";";
+
+	return str;
+
+}
+
+std::string enemy_positions(int p) {
+
+	std::string ret;
+	int j = 0;
+	for (int i = 0; i < num_clients; i++) {
+
+		if (i != p) {
+			std::string str="E";
+			str += itos(j);
+			str += ":";
+			str += ftos(clients[i].x);
+			str += ",";
+			str += ftos(clients[i].y);
+			str += ";";
+
+			ret += str;
+		}
+
+		j++;
+	}
+
+	return ret;
+
+}
+
+
 int main(int argc, char **argv)
 {
 	IPaddress ip;
@@ -287,8 +358,6 @@ int main(int argc, char **argv)
 	Uint32 ipaddr;
 	Uint16 port;
 	
-	//int p1x = 0, p1y = 0;
-
 	/* check our commandline */
 	if(argc<2)
 	{
@@ -375,15 +444,16 @@ int main(int argc, char **argv)
 
 				if(name > "")
 				{
-					Client *client;
-					client=add_client(sock,name);
-					if(client)
-						who_command(client);
+					std::cout << "name: " << name << std::endl;
+
+					add_client(sock,name);
 				}
 				else
 					SDLNet_TCP_Close(sock);
 			}
 		}
+
+		std::cout  << "client loop" << std::endl;
 		//-------------------------------------------------------------------------------
 		// LOOP THROUGH CLIENTS
 		//-------------------------------------------------------------------------------
@@ -398,31 +468,16 @@ int main(int argc, char **argv)
 				message = recv_message(clients[i].sock);
 
 				if(message > "")
-				{
-					std::string str;
-					
+				{					
 					numready--;
-					std::cout << "<" << clients[i].name << ">" << " " << message;
+					std::cout << "<" << clients[i].name << ">" << " " << message << std::endl;
 					
-					// interpret message
-					if (message == "1") {
+					std::string str = "";
+					str += update_position(i, message);
+					str += enemy_positions(i);
 
-						clients[i].y--;
-					}
-					else if (message == "2") {
+					std::cout << str << std::endl;
 
-						clients[i].y++;
-					}
-					else if (message == "3") {
-
-						clients[i].x--;
-					}
-					else if (message == "4") {
-
-						clients[i].x++;
-					}
-		
-					str=mformat("cdcdcc",'p',clients[i].x,',',clients[i].y,';','#');
 					if(str > "")
 						send_all(str);				
 				}

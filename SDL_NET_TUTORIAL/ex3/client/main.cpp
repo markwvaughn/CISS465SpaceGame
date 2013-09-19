@@ -20,6 +20,8 @@
 #include "SDL_net.h"
 
 const int MAXLEN = 1024;
+int num_enemies = 0;
+std::vector<std::vector<float> > enemies;
 
 std::string recv_message(TCPsocket sock) {
 
@@ -46,6 +48,96 @@ int send_message(std::string msg, TCPsocket sock) {
     return 1;
 }
 
+void players_pos(std::string message, float & rect_x, float & rect_y) {
+
+	int i = 0;
+	std::string x_pos;
+	std::string y_pos;
+
+	while (message[i] != 'p' && message[i + 1] != ':') {
+		i++;
+	}
+	i++;
+	i++;
+
+	while (message[i] != ',') {
+		x_pos += message[i];
+		i++;
+	}
+
+	i++;
+	while (message[i] != ';') {
+		y_pos += message[i];
+		i++;
+	}
+
+	std::cout << x_pos << std::endl;
+	std::cout << y_pos << std::endl;
+
+	rect_x = atof(x_pos.c_str());
+	rect_y = atof(y_pos.c_str());
+}
+
+void get_num_enemies(std::string message) {
+
+	std::string num;
+
+	int i = 0;
+	while (message[i] != 'n' && message[i + 1] != ':') {
+		i++;
+	}
+
+	i++;
+	while (message[i] != ';') {
+		num += message[i];
+		i++;
+	}
+
+	std::cout << num << std::endl;
+
+	num_enemies = atoi(num.c_str());
+}
+
+void enemy_positions(std::string message) {
+
+	std::vector<std::vector<float> > enemies;
+
+	int j = 0;
+	for (int i = 0; i < num_enemies; i++) {
+
+		std::string x_pos;
+		std::string y_pos;
+
+		while (message[j] != 'E')
+			j++;
+		j++;
+
+		while (message[j] != ':')
+			j++;
+
+		while (message[j] != ',') {
+			x_pos += message[j];
+			j++;
+		}
+
+		j++;
+		while (message[j] != ';') {
+			y_pos += message[j];
+			j++;
+		}
+		j++;
+
+		float x = atof(x_pos.c_str());
+		float y = atof(y_pos.c_str());
+
+		std::vector <float> pos;
+		pos.push_back(x);
+		pos.push_back(y);
+
+		enemies.push_back(pos);
+	}
+
+}
 
 int main(int argc, char **argv)
 {
@@ -138,10 +230,10 @@ int main(int argc, char **argv)
 	Surface surface(W, H);
 	Event event;
 
-	int rect_x;
-	int rect_y;
-	int rect_w;
-	int rect_h;
+	float rect_x;
+	float rect_y;
+	float rect_w;
+	float rect_h;
 
 	rect_x = 0;
 	rect_y = 0;
@@ -190,30 +282,16 @@ int main(int argc, char **argv)
 		from_server = "";
 		if(numready && SDLNet_SocketReady(sock))
 		{
-			
 			from_server = recv_message(sock);
 			if (from_server[0] == 'p') {
 
+				
+				players_pos(from_server, rect_x, rect_y);
+				enemy_positions(from_server);
+				get_num_enemies(from_server);
+
 				std::string x_pos;
 				std::string y_pos;	
-
-				int i = 1;
-				while (from_server[i] != ',') {
-					x_pos += from_server[i];
-					i++;
-				}
-
-				i++;
-				while (from_server[i] != ';') {
-					y_pos += from_server[i];
-					i++;
-				}
-
-				std::cout << x_pos << std::endl;
-				std::cout << y_pos << std::endl;
-
-				rect_x = atoi(x_pos.c_str());
-				rect_y = atoi(y_pos.c_str());
 			}
 		}
 
@@ -224,6 +302,11 @@ int main(int argc, char **argv)
 		surface.lock();
 		surface.fill(BLACK);
 		surface.put_rect(rect_x, rect_y, rect_w, rect_h, 0, 255 , 0);
+
+		for (int i = 0; i < num_enemies; i++) {
+			surface.put_rect(enemies[i][0], enemies[i][1], 30, 30, 255, 0 , 0);
+		}
+
 		surface.unlock();
 		surface.flip();
 
