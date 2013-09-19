@@ -28,8 +28,8 @@ std::string recv_message(TCPsocket sock) {
     char buff[MAXLEN];
 	SDLNet_TCP_Recv(sock, buff, MAXLEN);
 
-	std::cout << "buffer: " << buff << std::endl;
-	std::cout << "length: " << strlen(buff) << std::endl;
+	// std::cout << "buffer: " << buff << std::endl;
+	// std::cout << "length: " << strlen(buff) << std::endl;
 
     if (buff == NULL) {
     	std::string ret = "";
@@ -71,38 +71,22 @@ void players_pos(std::string message, float & rect_x, float & rect_y) {
 		i++;
 	}
 
-	std::cout << x_pos << std::endl;
-	std::cout << y_pos << std::endl;
+	// std::cout << x_pos << std::endl;
+	// std::cout << y_pos << std::endl;
 
 	rect_x = atof(x_pos.c_str());
 	rect_y = atof(y_pos.c_str());
 }
 
-void get_num_enemies(std::string message) {
-
-	std::string num;
-
-	int i = 0;
-	while (message[i] != 'n' && message[i + 1] != ':') {
-		i++;
-	}
-
-	i++;
-	while (message[i] != ';') {
-		num += message[i];
-		i++;
-	}
-
-	std::cout << num << std::endl;
-
-	num_enemies = atoi(num.c_str());
-}
-
 void enemy_positions(std::string message) {
 
-	std::vector<std::vector<float> > enemies;
-
 	int j = 0;
+	int num_enemies = 0;
+	for (int i = 0; i < message.length(); i++) {
+		if (message[i] == 'E')
+			num_enemies++;
+	}
+
 	for (int i = 0; i < num_enemies; i++) {
 
 		std::string x_pos;
@@ -114,6 +98,8 @@ void enemy_positions(std::string message) {
 
 		while (message[j] != ':')
 			j++;
+
+		j++;
 
 		while (message[j] != ',') {
 			x_pos += message[j];
@@ -133,7 +119,6 @@ void enemy_positions(std::string message) {
 		std::vector <float> pos;
 		pos.push_back(x);
 		pos.push_back(y);
-
 		enemies.push_back(pos);
 	}
 
@@ -251,22 +236,22 @@ int main(int argc, char **argv)
 		if (keypressed[UPARROW]) {
 			to_server = "1";
 			send_message(to_server, sock);
-			std::cout << "up arrow" << std::endl;
+			//std::cout << "up arrow" << std::endl;
 		}
 		else if (keypressed[DOWNARROW]) {
 			to_server = "2";
 			send_message(to_server, sock);
-			std::cout << "down arrow" << std::endl;
+			//std::cout << "down arrow" << std::endl;
 		}
 		else if (keypressed[LEFTARROW]) {
 			to_server = "3";
 			send_message(to_server, sock);
-			std::cout << "left arrow" << std::endl;
+			//std::cout << "left arrow" << std::endl;
 		}
 		else if (keypressed[RIGHTARROW]) {
 			to_server = "4";
 			send_message(to_server, sock);
-			std::cout << "right arrow" << std::endl;
+			//std::cout << "right arrow" << std::endl;
 		}
 
 		numready=SDLNet_CheckSockets(set, 100);
@@ -283,15 +268,10 @@ int main(int argc, char **argv)
 		if(numready && SDLNet_SocketReady(sock))
 		{
 			from_server = recv_message(sock);
+			std::cout << "from server: " << from_server << std::endl;
 			if (from_server[0] == 'p') {
-
-				
 				players_pos(from_server, rect_x, rect_y);
-				enemy_positions(from_server);
-				get_num_enemies(from_server);
-
-				std::string x_pos;
-				std::string y_pos;	
+				enemy_positions(from_server);	
 			}
 		}
 
@@ -301,12 +281,12 @@ int main(int argc, char **argv)
 	
 		surface.lock();
 		surface.fill(BLACK);
-		surface.put_rect(rect_x, rect_y, rect_w, rect_h, 0, 255 , 0);
-
-		for (int i = 0; i < num_enemies; i++) {
+		
+		for (int i = 0; i < enemies.size(); i++) {
 			surface.put_rect(enemies[i][0], enemies[i][1], 30, 30, 255, 0 , 0);
 		}
 
+		surface.put_rect(rect_x, rect_y, rect_w, rect_h, 0, 255 , 0);
 		surface.unlock();
 		surface.flip();
 

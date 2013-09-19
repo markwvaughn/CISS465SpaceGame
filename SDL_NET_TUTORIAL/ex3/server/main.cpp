@@ -20,11 +20,6 @@
 #include "Event.h"
 #include "SDL_net.h"
 
-// #include <string.h>
-// #include <stdarg.h>
-// #include <stdlib.h>
-// #include <unistd.h>
-
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -134,23 +129,22 @@ int unique_nick(std::string s)
 /* add a client into our array of clients */
 void add_client(TCPsocket sock, std::string name)
 {
-	// if(!name.length())
-	// {
-	// 	send_message("Invalid Nickname...bye bye!", sock);
-	// 	SDLNet_TCP_Close(sock);
-	// 	return(NULL);
-	// }
-	// if(!unique_nick(name))
-	// {
-	// 	send_message("Duplicate Nickname...bye bye!", sock);
-	// 	SDLNet_TCP_Close(sock);
-	// 	return(NULL);
-	// }
+	if(!name.length())
+	{
+		send_message("Invalid Nickname...bye bye!", sock);
+		SDLNet_TCP_Close(sock);
+		return;
+	}
+	if(!unique_nick(name))
+	{
+		send_message("Duplicate Nickname...bye bye!", sock);
+		SDLNet_TCP_Close(sock);
+		return;
+	}
 	
 	std::cout << "inside add client" << std::endl;
 	std::cout << "num clients: " << num_clients << std::endl;
 
-	//clients=(Client*)realloc(clients, (num_clients+1)*sizeof(Client));
 	Client c;
 
 	c.name=name;
@@ -163,9 +157,9 @@ void add_client(TCPsocket sock, std::string name)
 	num_clients++;
 
 	/* server side info */
-	//std::cout << "--> " << name << std::endl;
+	std::cout << "--> " << name << std::endl;
 	/* inform all clients, including the new one, of the joined user */
-	//send_all(mformat("ss","--> ",name.c_str()));
+	send_all(mformat("ss","--> ",name.c_str()));
 }
 
 /* find a client in our array of clients by it's socket. */
@@ -207,8 +201,7 @@ void remove_client(int i)
 	/* server side info */
 	std::cout << "<-- " << name << std::endl;
 	/* inform all clients, excluding the old one, of the disconnected user */
-	
-	//send_all(mformat("ss","<-- ",name.c_str()));
+	send_all(mformat("ss","<-- ",name.c_str()));
 	
 }
 
@@ -245,6 +238,15 @@ void send_all(std::string buf)
 		else
 			remove_client(cindex);
 	}
+}
+
+void send_client(int i, std::string buf) {
+
+	if (buf == "") {
+		return;
+	}
+
+	send_message(buf, clients[i].sock);
 }
 
 void who_command(Client *client) {
@@ -388,8 +390,7 @@ int main(int argc, char **argv)
 	/* Resolve the argument into an IPaddress type */
 	if(SDLNet_ResolveHost(&ip,NULL,port)==-1)
 	{
-		//printf("SDLNet_ResolveHost: %s\n",SDLNet_GetError());
-		std::cout << "ERROR" << std::endl;
+		std::cout << "SDLNet_ResolveHost: ERROR" << std::endl;
 		SDLNet_Quit();
 		SDL_Quit();
 		exit(3);
@@ -405,8 +406,7 @@ int main(int argc, char **argv)
 	server=SDLNet_TCP_Open(&ip);
 	if(!server)
 	{
-		//printf("SDLNet_TCP_Open: %s\n",SDLNet_GetError());
-		std::cout << "ERROR" << std::endl;
+		std::cout << "SDLNet_TCP_Open ERROR" << std::endl;
 		SDLNet_Quit();
 		SDL_Quit();
 		exit(4);
@@ -425,8 +425,7 @@ int main(int argc, char **argv)
 		numready=SDLNet_CheckSockets(set, (Uint32)-1);
 		if(numready==-1)
 		{
-			//printf("SDLNet_CheckSockets: %s\n",SDLNet_GetError());
-			std::cout << "ERROR" << std::endl;
+			std::cout << "SDLNet_CheckSockets ERROR" << std::endl;
 			break;
 		}
 		if(!numready)
@@ -457,36 +456,33 @@ int main(int argc, char **argv)
 		//-------------------------------------------------------------------------------
 		// LOOP THROUGH CLIENTS
 		//-------------------------------------------------------------------------------
+		std::vector<std::string> strings;
 		for(int i=0; numready && i<num_clients; i++)
 		{
+			strings.push_back("");
+			message = "";
+			std::cout << "SDL SOCKET READY: " << SDLNet_SocketReady(clients[i].sock) << std::endl;
 			if(SDLNet_SocketReady(clients[i].sock))
 			{
 				//-----------------------------------------------------------------------
 				// GET DATA FROM CLIENT
 				//-----------------------------------------------------------------------
-				message = "";
 				message = recv_message(clients[i].sock);
-
+				std::cout << "message: " << message << std::endl;
 				if(message > "")
 				{					
 					numready--;
 					std::cout << "<" << clients[i].name << ">" << " " << message << std::endl;
-					
-					std::string str = "";
-					str += update_position(i, message);
-					str += enemy_positions(i);
-
-					std::cout << str << std::endl;
-
-					if(str > "")
-						send_all(str);				
 				}
-				else
-					remove_client(i);
 			}
+
+			strings[i] += update_position(i, message);
+			strings[i] += enemy_positions(i);
+
+			if (strings[i] > "")
+				send_client(i, strings[i]);
 		}
 	}
-
 	/* shutdown SDL_net */
 	SDLNet_Quit();
 
