@@ -25,31 +25,6 @@
 
 const int MAXLEN = 1024;
 
-std::string recv_message(TCPsocket sock) {
-
-    char buff[MAXLEN];
-	SDLNet_TCP_Recv(sock, buff, MAXLEN);
-
-	std::cout << "buffer: " << buff << std::endl;
-	std::cout << "length: " << strlen(buff) << std::endl;
-
-    if (buff == NULL) {
-    	std::string ret = "";
-    	return ret;
-    }
-    std::string ret(buff, MAXLEN);
-    ret = ret.substr(0, strlen(buff));
-    return ret;
-}
-
-int send_message(std::string msg, TCPsocket sock) {
-
-	char * buff = (char *)msg.c_str();		
-	SDLNet_TCP_Send(sock, buff, MAXLEN);
-
-    return 1;
-}
-
 struct Client {
 	TCPsocket sock;
 	std::string name;
@@ -61,72 +36,54 @@ std::vector<Client> clients;
 int num_clients=0;
 TCPsocket server;
 
+void send_client(int, std::string);
 void send_all(std::string buf);
 int find_client_name(std::string name);
 
-std::string mformat(char *format,...)
-{
-	va_list ap;
-	Uint32 len=0;
-	static char *str=NULL;
-	char *p, *s;
-	char c;
-	int d;
-	unsigned int u;
+std::string ftos(float f) {
+	std::ostringstream buff;
+	buff << f;
 
-	if(str)
-	{
-		free(str);
-		str=NULL;
-	}
-	if(!format)
-		return(NULL);
-	va_start(ap,format);
-	for(p=format; *p; p++)
-	{
-		switch(*p)
-		{
-			case 's': /* string */
-				s=va_arg(ap, char*);
-				str=(char*)realloc(str,((len+strlen(s)+4)/4)*4);
-				sprintf(str+len,"%s",s);
-				break;
-			case 'c': /* char */
-				c=(char)va_arg(ap, int);
-				str=(char*)realloc(str,len+4);
-				sprintf(str+len,"%c",c);
-				break;
-			case 'd': /* int */
-				d=va_arg(ap, int);
-				str=(char*)realloc(str,((len+64)/4)*4);
-				sprintf(str+len,"%d",d);
-				break;
-			case 'u': /* unsigned int */
-				u=va_arg(ap, unsigned int);
-				str=(char*)realloc(str,((len+64)/4)*4);
-				sprintf(str+len,"%u",u);
-				break;
-		}
-		/* set len to the new string length */
-		if(str)
-			len=strlen(str);
-		else
-			len=0;
-	}
-	va_end(ap);
-
-	std::string ret(str);
-
-	return ret;
+	return buff.str();
 }
 
-/* test for nice name uniqueness among already connected users */
+std::string itos(int i) {
+	std::ostringstream buff;
+	buff << i;
+
+	return buff.str();
+}
+
+std::string recv_message(TCPsocket sock) {
+
+    char buff[MAXLEN] = {' '};
+    SDLNet_TCP_Recv(sock, buff, MAXLEN);
+
+    // std::cout << "buffer: " << buff << std::endl;
+    // std::cout << "length: " << strlen(buff) << std::endl;
+
+    if (buff == NULL) {
+        std::string ret = "";
+        return ret;
+    }
+    std::string ret(buff, MAXLEN);
+    ret = ret.substr(0, strlen(buff));
+    return ret;
+}
+
+int send_message(std::string msg, TCPsocket sock) {
+
+    char * buff = (char *)msg.c_str();      
+    SDLNet_TCP_Send(sock, buff, MAXLEN);
+
+    return 1;
+}
+
 int unique_nick(std::string s)
 {
 	return(find_client_name(s)==-1);
 }
 
-/* add a client into our array of clients */
 void add_client(TCPsocket sock, std::string name)
 {
 	if(!name.length())
@@ -149,17 +106,18 @@ void add_client(TCPsocket sock, std::string name)
 
 	c.name=name;
 	c.sock=sock;
-	c.x=0.0;
-	c.y=0.0;
+	c.x= rand() % W;
+	c.y= rand() % H;
 
 	clients.push_back(c);
 
 	num_clients++;
 
-	/* server side info */
-	std::cout << "--> " << name << std::endl;
-	/* inform all clients, including the new one, of the joined user */
-	send_all(mformat("ss","--> ",name.c_str()));
+	std::string player_number = "N";
+	player_number += itos(num_clients - 1);
+	player_number += ";#";
+	// send client their player number
+	send_client(num_clients - 1, player_number);
 }
 
 /* find a client in our array of clients by it's socket. */
@@ -201,7 +159,7 @@ void remove_client(int i)
 	/* server side info */
 	std::cout << "<-- " << name << std::endl;
 	/* inform all clients, excluding the old one, of the disconnected user */
-	send_all(mformat("ss","<-- ",name.c_str()));
+	//send_all(mformat("ss","<-- ",name.c_str()));
 	
 }
 
@@ -262,14 +220,14 @@ void who_command(Client *client) {
 		ipaddr=SDLNet_TCP_GetPeerAddress(clients[i].sock);
 		if(ipaddr)
 		{
-			std::string info(mformat("sssssdsdsdsdsd","--- ",clients[i].name.c_str(),
-					" ",host?host:"",
-					"[",ip>>24,".", (ip>>16)&0xff,".", (ip>>8)&0xff,".", ip&0xff,
-					"] port ",(Uint32)ipaddr->port));
+			// std::string info(mformat("sssssdsdsdsdsd","--- ",clients[i].name.c_str(),
+			// 		" ",host?host:"",
+			// 		"[",ip>>24,".", (ip>>16)&0xff,".", (ip>>8)&0xff,".", ip&0xff,
+			// 		"] port ",(Uint32)ipaddr->port));
 
-			ip=SDL_SwapBE32(ipaddr->host);
-			host=SDLNet_ResolveIP(ipaddr);
-			send_message(info, client->sock);
+			// ip=SDL_SwapBE32(ipaddr->host);
+			// host=SDLNet_ResolveIP(ipaddr);
+			// send_message(info, client->sock);
 		}
 	}
 
@@ -277,18 +235,17 @@ void who_command(Client *client) {
 	return;
 }
 
-std::string ftos(float f) {
-	std::ostringstream buff;
-	buff << f;
+std::string format_pos_string(int i) {
+	
+	std::string str="p";
+	str += itos(i);
+	str += ":";
+	str += ftos(clients[i].x);
+	str += ",";
+	str += ftos(clients[i].y);
+	str += ";";
 
-	return buff.str();
-}
-
-std::string itos(int i) {
-	std::ostringstream buff;
-	buff << i;
-
-	return buff.str();
+	return str;
 }
 
 std::string update_position(int i, std::string message) {
@@ -311,36 +268,20 @@ std::string update_position(int i, std::string message) {
 		clients[i].x += 0.5f;
 	}
 
-	std::string str="p";
-	str += ":";
-	str += ftos(clients[i].x);
-	str += ",";
-	str += ftos(clients[i].y);
-	str += ";";
-
+	std::string str = format_pos_string(i);
 	return str;
 
 }
 
-std::string enemy_positions(int p) {
+std::string other_positions(int p) {
 
 	std::string ret;
-	int j = 0;
 	for (int i = 0; i < num_clients; i++) {
 
 		if (i != p) {
-			std::string str="E";
-			str += itos(j);
-			str += ":";
-			str += ftos(clients[i].x);
-			str += ",";
-			str += ftos(clients[i].y);
-			str += ";";
-
+			std::string str = format_pos_string(i);
 			ret += str;
 		}
-
-		j++;
 	}
 
 	return ret;
@@ -452,35 +393,39 @@ int main(int argc, char **argv)
 			}
 		}
 
-		std::cout  << "client loop" << std::endl;
+		//std::cout  << "client loop" << std::endl;
 		//-------------------------------------------------------------------------------
 		// LOOP THROUGH CLIENTS
 		//-------------------------------------------------------------------------------
-		std::vector<std::string> strings;
 		for(int i=0; numready && i<num_clients; i++)
 		{
-			strings.push_back("");
 			message = "";
-			std::cout << "SDL SOCKET READY: " << SDLNet_SocketReady(clients[i].sock) << std::endl;
+			std::string str = "";
 			if(SDLNet_SocketReady(clients[i].sock))
 			{
 				//-----------------------------------------------------------------------
 				// GET DATA FROM CLIENT
 				//-----------------------------------------------------------------------
 				message = recv_message(clients[i].sock);
-				std::cout << "message: " << message << std::endl;
+				//std::cout << "message: " << message << std::endl;
 				if(message > "")
 				{					
 					numready--;
-					std::cout << "<" << clients[i].name << ">" << " " << message << std::endl;
+					//std::cout << "<" << clients[i].name << ">" << " " << message << std::endl;
+					str += update_position(i, message);
+
 				}
 			}
 
-			strings[i] += update_position(i, message);
-			strings[i] += enemy_positions(i);
+			str += other_positions(i);
+			str += "#";
 
-			if (strings[i] > "")
-				send_client(i, strings[i]);
+			//std::cout << "message to client: " << str << std::endl;
+
+			if (str[0] == 'p') {
+				send_all(str);
+			}
+
 		}
 	}
 	/* shutdown SDL_net */
