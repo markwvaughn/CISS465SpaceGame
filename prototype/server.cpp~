@@ -27,10 +27,10 @@ void fancygreet(char * text);
 // This is just a typedef for a buffer
 typedef char Buffer[1024];
 
-struct
+struct Network_event
 {
     bool received;
-} Network_event;
+};
 
 // This is the buffer that we will send to the clients
 Buffer to_client = "HELLO CLIENT!";
@@ -73,8 +73,8 @@ char * get_greetings_client()
             ne->received = true;
 
             SDL_UserEvent e;
-            e.type = SDL_USEREVENT_;
-            SDL_Pushevent(&);
+            e.type = SDL_USEREVENT;
+            SDL_Pushevent(&e);
             // the connection has been established and we can communicate
             
             // Send message to client

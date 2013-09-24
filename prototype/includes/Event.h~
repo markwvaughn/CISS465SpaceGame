@@ -60,7 +60,6 @@ const Uint32 JOYSTICKHATMOTION = SDL_JOYHATMOTION;
 
 class Event;
 class Keyboard;
-class Network;
 
 class Event
 {

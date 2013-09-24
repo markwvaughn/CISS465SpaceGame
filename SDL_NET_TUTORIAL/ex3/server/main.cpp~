@@ -66,8 +66,8 @@ std::string recv_message(TCPsocket sock) {
         std::string ret = "";
         return ret;
     }
-    
-    std::string ret(buff, strlen(buff)); // #This should work too.
+    std::string ret(buff, MAXLEN);
+    ret = ret.substr(0, strlen(buff));
     return ret;
 }
 
@@ -147,7 +147,7 @@ void remove_client(int i)
 {
 	std::string name=clients[i].name;
 
-	if(i<0 || i>=num_clients) // #OR? and not AND?
+	if(i<0 && i>=num_clients)
 		return;
 	
 	/* close the old socket, even if it's dead... */

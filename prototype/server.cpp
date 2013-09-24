@@ -14,8 +14,6 @@
 #include "Includes.h"
 #include "Constants.h"
 #include "compgeom.h"
-#include "Surface.h"
-#include "Event.h"
 
 
 /*****************************************************************************
@@ -134,7 +132,10 @@ void fancygreet(char * text)
 	while (1)
 	{
 		if (event.poll() && event.type() == QUIT) break;
-        if (event.poll() && event.type() == Netw
+        if (event.poll() && event.type() == TCP_recv)
+        {
+            
+        }
 
 		int start = getTicks();
 
@@ -246,8 +247,6 @@ the call to test_pixel() and run the program. Etc.
 *****************************************************************************/
 int main(int argc, char* argv[])
 {
-	//freopen("CON", "w", stdout);
-	//freopen("CON", "w", stderr);
     SDLNet_Init();
     
     get_greetings_client();
