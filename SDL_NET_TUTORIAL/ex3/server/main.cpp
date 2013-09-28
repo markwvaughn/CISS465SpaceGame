@@ -1,51 +1,77 @@
-/**
+/******************************************************************************
  * This is a very simple example with SDL_net. There is no error checking atm.
  * Run client.exe or telnet 127.0.0.1 1234 (local client) to test
- **/
+ *****************************************************************************/
 
-#include <iostream>
+
+/******************************************************************************
+ * BEGIN Includes.
+ *****************************************************************************/
+
+// Standard includes
 #include <cmath>
-#include <vector>
-#include <string>
-#include <fstream>
-#include <ctime>
-#include <cmath>
+#include <cstdio>
 #include <cstdlib>
+#include <ctime>
+#include <fstream>
+#include <iostream>
 #include <sstream>
-#include <string> 
+#include <string>
+#include <vector>
+
+// SDL wrapper from Dr. Liow
 #include "Includes.h"
-#include "Constants.h"
-#include "compgeom.h"
-#include "Surface.h"
 #include "Event.h"
+#include "compgeom.h"
+#include "Constants.h"
+#include "Surface.h"
+
+// SDL net
 #include "SDL_net.h"
 
-#include <stdio.h>
-#include <stdlib.h>
+
+/******************************************************************************
+ * END Includes.
+ *****************************************************************************/
 
 
-const int MAXLEN = 1024;
-
-
-struct Client
+/******************************************************************************
+ * Class definitions.
+ *****************************************************************************/
+class Client
 {
+public:
 	TCPsocket sock;
 	std::string name;
 	float x, y;
+    bool active;
 };
 
 
+/******************************************************************************
+ * Global Constants.
+ *****************************************************************************/
+const int MAXLEN = 1024;
+
+
+/******************************************************************************
+ * Global Variables.
+ *****************************************************************************/
 int running=1;
 std::vector<Client> clients;
 int num_clients=0;
 TCPsocket server;
 
 
+/******************************************************************************
+ * Functions
+ *****************************************************************************/
 void send_client(int, std::string);
 void send_all(std::string buf);
 int find_client_name(std::string name);
 
 
+// Converts a float to string
 std::string ftos(float f)
 {
 	std::ostringstream buff;
@@ -54,6 +80,8 @@ std::string ftos(float f)
 	return buff.str();
 }
 
+
+// Converts an integer to string
 std::string itos(int i)
 {
 	std::ostringstream buff;
@@ -63,24 +91,24 @@ std::string itos(int i)
 }
 
 
+// Receive a string over TCP/IP
 std::string recv_message(TCPsocket sock)
 {
     char buff[MAXLEN] = {' '};
     SDLNet_TCP_Recv(sock, buff, MAXLEN);
 
-    // std::cout << "buffer: " << buff << std::endl;
-    // std::cout << "length: " << strlen(buff) << std::endl;
-
-    if (buff == NULL) {
+    if (buff == NULL)
+    {
         std::string ret = "";
         return ret;
     }
     
-    std::string ret(buff, strlen(buff)); // #This should work too.
+    std::string ret(buff, strlen(buff));
     return ret;
 }
 
 
+// Send a string over TCP/IP
 int send_message(std::string msg, TCPsocket sock)
 {
     char * buff = (char *)msg.c_str();      
@@ -90,12 +118,14 @@ int send_message(std::string msg, TCPsocket sock)
 }
 
 
-int unique_nick(std::string s)
+// Check if the desired nickname from the client is available
+bool is_nick_available(std::string s)
 {
 	return(find_client_name(s)==-1);
 }
 
 
+// Add a client to the list of clients
 void add_client(TCPsocket sock, std::string name)
 {
 	if(!name.length())
@@ -104,26 +134,27 @@ void add_client(TCPsocket sock, std::string name)
 		SDLNet_TCP_Close(sock);
 		return;
 	}
-	if(!unique_nick(name))
+	if(!is_nick_available(name))
 	{
 		send_message("Duplicate Nickname...bye bye!", sock);
 		SDLNet_TCP_Close(sock);
 		return;
 	}
 	
-	std::cout << "inside add client" << std::endl;
-	std::cout << "num clients: " << num_clients << std::endl;
-
 	Client c;
 
 	c.name = name;
 	c.sock = sock;
 	c.x= rand() % W;
 	c.y= rand() % H;
+    c.active = true;
 
 	clients.push_back(c);
 
 	num_clients++;
+
+	std::cout << "inside add client" << std::endl;
+	std::cout << "num clients: " << num_clients << std::endl;
 
 	// Send an acknowledgement
     std::string player_number = "N";
@@ -141,7 +172,8 @@ int find_client(TCPsocket sock)
 	for(int i = 0; i < num_clients; i++)
 		if(clients[i].sock == sock)
 			return(i);
-	return(-1);
+
+    return -1;
 }
 
 
@@ -157,25 +189,24 @@ int find_client_name(std::string name)
 }
 
 
-/* remove a client from our array of clients */
-void remove_client(int i)
+/* closes the socket of a disconnected client */
+void handle_disconnect(int i)
 {
 	std::string name=clients[i].name;
 
-	if(i<0 || i>=num_clients) // #OR? and not AND?
+	if(i<0 || i>=num_clients)
 		return;
 	
 	/* close the old socket, even if it's dead... */
 	SDLNet_TCP_Close(clients[i].sock);
-	
-	num_clients--;
-	clients.erase(clients.begin() + i);
-	
-	/* server side info */
-	std::cout << "<-- " << name << std::endl;
-	/* inform all clients, excluding the old one, of the disconnected user */
-	//send_all(mformat("ss","<-- ",name.c_str()));
-	
+    clients[i].active = false;
+}
+
+
+/* Reconnects a client */
+void reconnect(std::string name, std::string password)
+{
+    // pass for now
 }
 
 
@@ -186,73 +217,52 @@ SDLNet_SocketSet create_sockset()
 
 	if(set)
 		SDLNet_FreeSocketSet(set);
-	set=SDLNet_AllocSocketSet(num_clients+1);
-	if(!set) {
-		printf("SDLNet_AllocSocketSet: %s\n", SDLNet_GetError());
-		exit(1); /*most of the time this is a major error, but do what you want. */
+	set = SDLNet_AllocSocketSet(num_clients + 1);
+	if(!set)
+    {
+        std::cerr << "SDLNet_AllocSocketSet: " << SDLNet_GetError() << std::endl;
+        return 0;
 	}
-	SDLNet_TCP_AddSocket(set,server);
-	for(int i=0;i<num_clients;i++)
-		SDLNet_TCP_AddSocket(set,clients[i].sock);
+	SDLNet_TCP_AddSocket(set, server);
+	for(int i=0; i<num_clients; i++)
+		SDLNet_TCP_AddSocket(set, clients[i].sock);
 	return(set);
 }
+
 
 /* send a buffer to all clients */
 void send_all(std::string buf)
 {
 	int cindex;
 
-	if(buf == "" || !num_clients)
+	if(buf == "" || num_clients == 0)
 		return;
-	cindex=0;
-	while(cindex<num_clients)
+    
+	cindex = 0;
+
+    while(cindex < num_clients)
 	{
 		if(send_message(buf, clients[cindex].sock))
 			cindex++;
 		else
-			remove_client(cindex);
+			handle_disconnect(cindex);
 	}
 }
 
-void send_client(int i, std::string buf) {
 
-	if (buf == "") {
-		return;
-	}
+// Send a string to a particular client
+void send_client(int i, std::string buf)
+{
+	if (buf == "")
+        return;
 
 	send_message(buf, clients[i].sock);
 }
 
-void who_command(Client *client) {
 
-	int i;
-	IPaddress *ipaddr;
-	Uint32 ip;
-	const char *host=NULL;
-	
-	send_message("--- Begin /WHO ", client->sock);
-	for(i=0;i<num_clients;i++)
-	{
-		ipaddr=SDLNet_TCP_GetPeerAddress(clients[i].sock);
-		if(ipaddr)
-		{
-			// std::string info(mformat("sssssdsdsdsdsd","--- ",clients[i].name.c_str(),
-			// 		" ",host?host:"",
-			// 		"[",ip>>24,".", (ip>>16)&0xff,".", (ip>>8)&0xff,".", ip&0xff,
-			// 		"] port ",(Uint32)ipaddr->port));
-
-			// ip=SDL_SwapBE32(ipaddr->host);
-			// host=SDLNet_ResolveIP(ipaddr);
-			// send_message(info, client->sock);
-		}
-	}
-
-	send_message("--- End /WHO", client->sock);
-	return;
-}
-
-std::string format_pos_string(int i) {
-	
+// Generate the string to be sent or something
+std::string format_pos_string(int i)
+{
 	std::string str="p";
 	str += itos(i);
 	str += ":";
@@ -264,32 +274,24 @@ std::string format_pos_string(int i) {
 	return str;
 }
 
+
+// Update the position of a client
 void update_position(int i, std::string message)
 {
-
-	// interpret message
-	if (message == "1") {
-
+	if (message == "1") 
 		clients[i].y -= 0.5f;
-	}
-	else if (message == "2") {
-
+	else if (message == "2")
 		clients[i].y += 0.5f;
-	}
-	else if (message == "3") {
-
+	else if (message == "3")
 		clients[i].x -= 0.5f;
-	}
-	else if (message == "4") {
-
-		clients[i].x += 0.5f;
-	}
+	else if (message == "4")
+        clients[i].x += 0.5f;
 }
 
 
+// Generates the string to be sent to all clients
 std::string calculate_positions()
 {
-
 	std::string ret;
 	for (int i = 0; i < num_clients; i++)
     {
@@ -301,6 +303,7 @@ std::string calculate_positions()
 }
 
 
+// Point of entry
 int main(int argc, char **argv)
 {
 	IPaddress ip;
@@ -349,9 +352,6 @@ int main(int argc, char **argv)
 		exit(3);
 	}
 
-	/* perform a byte endianess correction for the next printf */
-	ipaddr=SDL_SwapBE32(ip.host);
-
 	/* resolve the hostname for the IPaddress */
 	host=SDLNet_ResolveIP(&ip);
 
@@ -365,23 +365,22 @@ int main(int argc, char **argv)
 		exit(4);
 	}
 
-	std::cout << "H: " << host << std::endl;
-	std::cout << "S: " << server << std::endl;
-	std::cout << "I: " << ipaddr << std::endl;
-	std::cout << "P: " << port << std::endl;
+	std::cout << "Host: " << host << std::endl;
+    std::cout << "IP: " << ipaddr << std::endl;
+	std::cout << "Port: " << port << std::endl;
 
 
 	while(1)
 	{
 		int numready;
-		set=create_sockset();
-		numready=SDLNet_CheckSockets(set, (Uint32)-1);
-		if(numready==-1)
+		set = create_sockset();
+		numready = SDLNet_CheckSockets(set, (Uint32)-1);
+		if(numready == -1)
 		{
 			std::cout << "SDLNet_CheckSockets ERROR" << std::endl;
 			break;
 		}
-		if(!numready)
+		if(numready == 0)
 			continue;
 		if(SDLNet_SocketReady(server))
 		{
@@ -391,52 +390,48 @@ int main(int argc, char **argv)
 			if(sock)
 			{
 				std::string name;
-				std::cout << sock << std::endl;
+                
 				name = recv_message(sock);
 
-				if(name > "")
-				{
-					std::cout << "name: " << name << std::endl;
-
-					add_client(sock,name);
-				}
-				else
-					SDLNet_TCP_Close(sock);
-			}
+                add_client(sock,name);
+            }
+            else
+                SDLNet_TCP_Close(sock);
 		}
 
-		//std::cout  << "client loop" << std::endl;
-		//-------------------------------------------------------------------------------
+
+        std::string str = "";
+		//---------------------------------------------------------------------
 		// LOOP THROUGH CLIENTS
-		//-------------------------------------------------------------------------------
-		for(int i=0; numready && i<num_clients; i++)
+		//---------------------------------------------------------------------
+		for(int i = 0; numready > 0 && i < num_clients; i++)
 		{
 			message = "";
-			std::string str = "";
-			if(SDLNet_SocketReady(clients[i].sock))
-			{
-				//-----------------------------------------------------------------------
-				// GET DATA FROM CLIENT
-				//-----------------------------------------------------------------------
-				message = recv_message(clients[i].sock);
-				//std::cout << "message: " << message << std::endl;
-				if(message > "")
-				{					
-					numready--;
-					//std::cout << "<" << clients[i].name << ">" << " " << message << std::endl;
-					update_position(i, message);
-
-				}
-			}
-
-			str += calculate_positions();
-			str += "#";
-
-			//std::cout << "message to client: " << str << std::endl;
-      
-            send_all(str);
+            if (clients[i].active)
+            {
+                if(SDLNet_SocketReady(clients[i].sock))
+                {
+                    //---------------------------------------------------------
+                    // GET DATA FROM CLIENT
+                    //---------------------------------------------------------
+                    message = recv_message(clients[i].sock);
+                    //std::cout << "message: " << message << std::endl;
+                    if(message > "")
+                    {					
+                        //std::cout << "<" << clients[i].name << ">" << " " << message << std::endl;
+                        update_position(i, message);
+                        
+                    }
+                    numready--;
+                }
+            }
         }
+        str += calculate_positions();
+        str += "#";
+      
+        send_all(str);
 	}
+    
 	/* shutdown SDL_net */
 	SDLNet_Quit();
 

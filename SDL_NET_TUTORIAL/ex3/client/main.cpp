@@ -1,6 +1,8 @@
 /****************************************************************************
  * This is the client side of the Space Shooter project for CISS465
  ****************************************************************************/
+
+
 #include <iostream>
 #include <cmath>
 #include <vector>
@@ -166,6 +168,8 @@ void parse_player_data(std::string message)
         }
         else
         {
+            std::cout << "New guy with number: " << _p << std::endl;
+            std::cin.ignore();
             Player player(_x,_y,_p);
             players.push_back(player);
         }
@@ -290,6 +294,7 @@ int main(int argc, char **argv)
 
 	while(1)
 	{
+        std::cout << "players.size() is " << players.size() << std::endl;
 		numready=SDLNet_CheckSockets(set, 100);
         if(numready==-1)
 		{
@@ -308,7 +313,6 @@ int main(int argc, char **argv)
 
             parse_player_data(from_server);
 		}
-
 
 		FD_ZERO(&fdset);
 		memset(&tv, 0, sizeof(tv));
