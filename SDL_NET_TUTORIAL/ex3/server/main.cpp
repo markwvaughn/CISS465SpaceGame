@@ -23,39 +23,48 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+
 const int MAXLEN = 1024;
 
-struct Client {
+
+struct Client
+{
 	TCPsocket sock;
 	std::string name;
 	float x, y;
 };
+
 
 int running=1;
 std::vector<Client> clients;
 int num_clients=0;
 TCPsocket server;
 
+
 void send_client(int, std::string);
 void send_all(std::string buf);
 int find_client_name(std::string name);
 
-std::string ftos(float f) {
+
+std::string ftos(float f)
+{
 	std::ostringstream buff;
 	buff << f;
 
 	return buff.str();
 }
 
-std::string itos(int i) {
+std::string itos(int i)
+{
 	std::ostringstream buff;
 	buff << i;
 
 	return buff.str();
 }
 
-std::string recv_message(TCPsocket sock) {
 
+std::string recv_message(TCPsocket sock)
+{
     char buff[MAXLEN] = {' '};
     SDLNet_TCP_Recv(sock, buff, MAXLEN);
 
@@ -71,18 +80,21 @@ std::string recv_message(TCPsocket sock) {
     return ret;
 }
 
-int send_message(std::string msg, TCPsocket sock) {
 
+int send_message(std::string msg, TCPsocket sock)
+{
     char * buff = (char *)msg.c_str();      
     SDLNet_TCP_Send(sock, buff, MAXLEN);
 
     return 1;
 }
 
+
 int unique_nick(std::string s)
 {
 	return(find_client_name(s)==-1);
 }
+
 
 void add_client(TCPsocket sock, std::string name)
 {
@@ -104,8 +116,8 @@ void add_client(TCPsocket sock, std::string name)
 
 	Client c;
 
-	c.name=name;
-	c.sock=sock;
+	c.name = name;
+	c.sock = sock;
 	c.x= rand() % W;
 	c.y= rand() % H;
 
@@ -113,34 +125,37 @@ void add_client(TCPsocket sock, std::string name)
 
 	num_clients++;
 
-	std::string player_number = "N";
+	// Send an acknowledgement
+    std::string player_number = "N";
 	player_number += itos(num_clients - 1);
 	player_number += ";#";
 	// send client their player number
 	send_client(num_clients - 1, player_number);
 }
 
+
 /* find a client in our array of clients by it's socket. */
 /* the socket is always unique */
 int find_client(TCPsocket sock)
 {
-	for(int i=0;i<num_clients;i++)
-		if(clients[i].sock==sock)
+	for(int i = 0; i < num_clients; i++)
+		if(clients[i].sock == sock)
 			return(i);
 	return(-1);
 }
 
-/* find a client in our array of clients by it's socket. */
+
+/* find a client in our array of clients by it's name. */
 /* the name is always unique */
 int find_client_name(std::string name)
 {
-	for(int i=0; i < num_clients;i++) {
+	for(int i=0; i < num_clients;i++)
 		if (clients[i].name == name)
 			return i;
-	}
 		
 	return -1;
 }
+
 
 /* remove a client from our array of clients */
 void remove_client(int i)
@@ -162,6 +177,7 @@ void remove_client(int i)
 	//send_all(mformat("ss","<-- ",name.c_str()));
 	
 }
+
 
 /* create a socket set that has the server socket and all the client sockets */
 SDLNet_SocketSet create_sockset()
@@ -248,7 +264,8 @@ std::string format_pos_string(int i) {
 	return str;
 }
 
-std::string update_position(int i, std::string message) {
+void update_position(int i, std::string message)
+{
 
 	// interpret message
 	if (message == "1") {
@@ -267,25 +284,20 @@ std::string update_position(int i, std::string message) {
 
 		clients[i].x += 0.5f;
 	}
-
-	std::string str = format_pos_string(i);
-	return str;
-
 }
 
-std::string other_positions(int p) {
+
+std::string calculate_positions()
+{
 
 	std::string ret;
-	for (int i = 0; i < num_clients; i++) {
-
-		if (i != p) {
-			std::string str = format_pos_string(i);
-			ret += str;
-		}
-	}
+	for (int i = 0; i < num_clients; i++)
+    {
+        std::string str = format_pos_string(i);
+        ret += str;
+    }
 
 	return ret;
-
 }
 
 
@@ -412,21 +424,18 @@ int main(int argc, char **argv)
 				{					
 					numready--;
 					//std::cout << "<" << clients[i].name << ">" << " " << message << std::endl;
-					str += update_position(i, message);
+					update_position(i, message);
 
 				}
 			}
 
-			str += other_positions(i);
+			str += calculate_positions();
 			str += "#";
 
 			//std::cout << "message to client: " << str << std::endl;
-
-			if (str[0] == 'p') {
-				send_all(str);
-			}
-
-		}
+      
+            send_all(str);
+        }
 	}
 	/* shutdown SDL_net */
 	SDLNet_Quit();

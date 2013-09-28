@@ -66,8 +66,8 @@ std::string recv_message(TCPsocket sock) {
         std::string ret = "";
         return ret;
     }
-    std::string ret(buff, MAXLEN);
-    ret = ret.substr(0, strlen(buff));
+    
+    std::string ret(buff, strlen(buff)); // #This should work too.
     return ret;
 }
 
@@ -147,7 +147,7 @@ void remove_client(int i)
 {
 	std::string name=clients[i].name;
 
-	if(i<0 && i>=num_clients)
+	if(i<0 || i>=num_clients) // #OR? and not AND?
 		return;
 	
 	/* close the old socket, even if it's dead... */
@@ -248,7 +248,8 @@ std::string format_pos_string(int i) {
 	return str;
 }
 
-std::string update_position(int i, std::string message) {
+void update_position(int i, std::string message)
+{
 
 	// interpret message
 	if (message == "1") {
@@ -267,25 +268,20 @@ std::string update_position(int i, std::string message) {
 
 		clients[i].x += 0.5f;
 	}
-
-	std::string str = format_pos_string(i);
-	return str;
-
 }
 
-std::string other_positions(int p) {
+
+std::string calculate_positions()
+{
 
 	std::string ret;
-	for (int i = 0; i < num_clients; i++) {
-
-		if (i != p) {
-			std::string str = format_pos_string(i);
-			ret += str;
-		}
-	}
+	for (int i = 0; i < num_clients; i++)
+    {
+        std::string str = format_pos_string(i);
+        ret += str;
+    }
 
 	return ret;
-
 }
 
 
@@ -412,21 +408,18 @@ int main(int argc, char **argv)
 				{					
 					numready--;
 					//std::cout << "<" << clients[i].name << ">" << " " << message << std::endl;
-					str += update_position(i, message);
+					update_position(i, message);
 
 				}
 			}
 
-			str += other_positions(i);
+			str += calculate_positions();
 			str += "#";
 
 			//std::cout << "message to client: " << str << std::endl;
-
-			if (str[0] == 'p') {
-				send_all(str);
-			}
-
-		}
+      
+            send_all(str);
+        }
 	}
 	/* shutdown SDL_net */
 	SDLNet_Quit();

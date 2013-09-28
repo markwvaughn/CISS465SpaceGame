@@ -121,13 +121,15 @@ int send_message(std::string msg, TCPsocket sock)
 
 void parse_player_data(std::string message)
 {
-    std::string x_pos;
-    std::string y_pos;
-    std::string num;
-
-	for (int i = 0; i < message.length();)
+	int j = 0;
+	while (j < message.length())
     {
-        // find next player
+		int i = 0;
+		std::string x_pos;
+		std::string y_pos;
+		std::string num;
+
+		// find next player
 		while (message[i] != 'p')
 			i++;
 		i++;
@@ -169,7 +171,10 @@ void parse_player_data(std::string message)
             Player player(_x,_y,_p);
             players.push_back(player);
         }
-	}		
+        
+		j++;
+	}
+		
 }
 
 
@@ -304,9 +309,11 @@ int main(int argc, char **argv)
 		if(numready && SDLNet_SocketReady(sock))
 		{
 			from_server = recv_message(sock);
-            std::cout << from_server << std::endl;
 
-            parse_player_data(from_server);
+			if (from_server[0] == 'p')
+            {
+				parse_player_data(from_server);
+			}
 		}
 
 
