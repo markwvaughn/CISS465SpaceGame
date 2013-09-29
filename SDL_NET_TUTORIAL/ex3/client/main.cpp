@@ -1,37 +1,47 @@
-/****************************************************************************
+/******************************************************************************
  * This is the client side of the Space Shooter project for CISS465
- ****************************************************************************/
+ *****************************************************************************/
 
 
-#include <iostream>
+/******************************************************************************
+ * BEGIN Includes.
+ *****************************************************************************/
+
+// Standard includes
 #include <cmath>
-#include <vector>
-#include <string>
-#include <fstream>
-#include <ctime>
-#include <cmath>
+#include <cstdio>
 #include <cstdlib>
+#include <ctime>
+#include <fstream>
+#include <iostream>
 #include <sstream>
+#include <string>
+#include <vector>
 
-
+// SDL wrapper from Dr. Liow
 #include "Includes.h"
-#include "Constants.h"
-#include "compgeom.h"
-#include "Surface.h"
 #include "Event.h"
+#include "compgeom.h"
+#include "Constants.h"
+#include "Surface.h"
+
+// SDL net
 #include "SDL_net.h"
 
-// GLOBAL CONSTANTS
-const int MAXLEN = 1024;
+
+/******************************************************************************
+ * END Includes.
+ *****************************************************************************/
 
 
-// CLASS DEFINITIONS
+/******************************************************************************
+ * Class definitions.
+ *****************************************************************************/
 class Player
 {
-
 public:
-	Player(float x1, float y1, int num = -1)
-		: x(x1), y(y1), size(10.0), number(num)
+	Player(float x1, float y1, int num=-1, int state=0)
+		: x(x1), y(y1), size(10.0), number(num), status(state)
 	{
         switch(num)
         {
@@ -85,17 +95,29 @@ public:
 	}
     
     float x, y, size;
-	int number;
+	int number, status;
     float color[3];
 };
 
 
-// GLOBAL VARIABLES
-int player_number = -2;
+/******************************************************************************
+ * Global Constants.
+ *****************************************************************************/
+const int MAXLEN = 1024;
+
+
+/******************************************************************************
+ * Global Variables.
+ *****************************************************************************/
 std::vector<Player> players;
+SDL_Thread *net_thread=NULL, *local_thread=NULL;
+int player_number = -1;
 
 
-// FUNCTION IMPLEMENTATIONS
+/******************************************************************************
+ * Functions
+ *****************************************************************************/
+// Receive a string over TCP/IP
 std::string recv_message(TCPsocket sock)
 {
     char buff[MAXLEN] = {' '};
@@ -112,6 +134,7 @@ std::string recv_message(TCPsocket sock)
 }
 
 
+// Send a string over TCP/IP
 int send_message(std::string msg, TCPsocket sock)
 {
     char * buff = (char *)msg.c_str();      
@@ -123,54 +146,25 @@ int send_message(std::string msg, TCPsocket sock)
 
 void parse_player_data(std::string message)
 {
-    std::string x_pos;
-    std::string y_pos;
-    std::string num;
+    std::stringstream message_stream(message);
 
-	for (int i = 0; i < message.length();)
+    int num_players = 0, _status = 0;
+    float _x, _y;
+    
+    message_stream >> num_players;
+    
+	for (int i = 0; i < num_players; i++)
     {
-        // find next player
-		while (message[i] != 'p')
-			i++;
-		i++;
-
-		while (message[i] != ':')
+        if (i < players.size())
         {
-			num += message[i];
-			i++;
-		}
-		i++;
-
-		// x pos
-		while (message[i] != ',')
-        {
-			x_pos += message[i];
-			i++;
-		}
-		i++;
-
-		// y pos
-		while (message[i] != ';')
-        {
-			y_pos += message[i];
-			i++;
-		}
-
-		float _x = atof(x_pos.c_str());
-		float _y = atof(y_pos.c_str());
-		int   _p = atoi(num.c_str());
-
-		// assign to player
-        if (_p < players.size())
-        {
-            players[_p].x = _x;
-            players[_p].y = _y;
+            message_stream >> players[i].x >> players[i].y >> players[i].status;
         }
+        
         else
         {
-            std::cout << "New guy with number: " << _p << std::endl;
-            std::cin.ignore();
-            Player player(_x,_y,_p);
+            message_stream >> _x >> _y >> _status;
+
+            Player player(_x, _y, i, _status);
             players.push_back(player);
         }
 	}		
@@ -182,16 +176,17 @@ void recv_player_number(std::string message)
 	int i = 0;
 	std::string temp_num = "";
 
-	if (message[0] == 'N') {
+	if (message[0] == 'N')
+    {
 		i++;
-		while (message[i] != ';') {
+		while (message[i] != ';')
+        {
 			temp_num += message[i];
 			i++;
 		}
 	}
 
 	player_number = atoi(temp_num.c_str());
-
 }
 
 
@@ -199,26 +194,23 @@ int main(int argc, char **argv)
 {
 	IPaddress ip;
 	TCPsocket sock;
-	char message[MAXLEN];
+  
 	int numready;
 	Uint16 port;
-	SDLNet_SocketSet set;
-	fd_set fdset;
-	int result;
-	struct timeval tv;
+	SDLNet_SocketSet set;	
 
 	std::string name;
 	std::string to_server;
 	std::string from_server;
 
 	/* check our commandline */
-	if(argc<4)
+	if(argc < 4)
 	{
 		std::cout << "Usage: " << argv[0] << " host_ip host_port username" << std::endl;
 		return 0;
 	}
 	
-	name=argv[3];
+	name = argv[3];
 	
 	/* initialize SDL */
 	if(SDL_Init(SDL_INIT_EVERYTHING) == -1)
@@ -235,7 +227,7 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	set=SDLNet_AllocSocketSet(1);
+	set = SDLNet_AllocSocketSet(1);
 	if(!set)
 	{
 		std::cout << "SDLNet_AllocSocketSet ERROR" << std::endl;
@@ -280,15 +272,13 @@ int main(int argc, char **argv)
 
 	std::cout << "Logged in as: " << name << std::endl;
 	
-	std::string player_num_string = recv_message(sock);
-	recv_player_number(player_num_string);
+	recv_player_number(recv_message(sock));
 
 	std::cout << "player num: " << player_number << std::endl;
 
-	//-----------------------------------------------------------------------------------
+	//-------------------------------------------------------------------------
 	// GAME SEGMENT
-	//-----------------------------------------------------------------------------------
-
+	//-------------------------------------------------------------------------
 	Surface surface(W, H);
 	Event event;
 
@@ -296,7 +286,7 @@ int main(int argc, char **argv)
 	{
         std::cout << "players.size() is " << players.size() << std::endl;
 		numready=SDLNet_CheckSockets(set, 100);
-        if(numready==-1)
+        if(numready == -1)
 		{
 			std::cout << "SDLNet_CheckSockets ERROR" << std::endl;
 			break;
@@ -313,9 +303,6 @@ int main(int argc, char **argv)
 
             parse_player_data(from_server);
 		}
-
-		FD_ZERO(&fdset);
-		memset(&tv, 0, sizeof(tv));
 
 		if (event.poll() && event.type() == QUIT) break;
 
@@ -347,13 +334,16 @@ int main(int argc, char **argv)
 
 		for (int i = 0; i < players.size(); i++)
         {
-            surface.lock();
-            surface.put_rect(players[i].x, players[i].y,
-                             players[i].size, players[i].size,
-                             players[i].color[0],
-                             players[i].color[1],
-                             players[i].color[2]);
-            surface.unlock();
+            if (players[i].status)
+            {
+                surface.lock();
+                surface.put_rect(players[i].x, players[i].y,
+                                 players[i].size, players[i].size,
+                                 players[i].color[0],
+                                 players[i].color[1],
+                                 players[i].color[2]);
+                surface.unlock();
+            }
         }
 
 		surface.flip();

@@ -40,7 +40,12 @@
  *****************************************************************************/
 class Client
 {
-public:
+public:    
+    Client(TCPsocket s=NULL, std::string n="",
+           float x1=0.0f, float y1=0.0f, bool a=false)
+        : sock(s), name(n), x(x1), y(y1), active(a)
+    {}
+    
 	TCPsocket sock;
 	std::string name;
 	float x, y;
@@ -112,16 +117,14 @@ std::string recv_message(TCPsocket sock)
 int send_message(std::string msg, TCPsocket sock)
 {
     char * buff = (char *)msg.c_str();      
-    SDLNet_TCP_Send(sock, buff, MAXLEN);
-
-    return 1;
+    return SDLNet_TCP_Send(sock, buff, MAXLEN);
 }
 
 
 // Check if the desired nickname from the client is available
 bool is_nick_available(std::string s)
 {
-	return(find_client_name(s)==-1);
+	return(find_client_name(s) == -1);
 }
 
 
@@ -233,19 +236,16 @@ SDLNet_SocketSet create_sockset()
 /* send a buffer to all clients */
 void send_all(std::string buf)
 {
-	int cindex;
-
 	if(buf == "" || num_clients == 0)
 		return;
     
-	cindex = 0;
-
-    while(cindex < num_clients)
+    for (int i = 0; i < num_clients; i++)
 	{
-		if(send_message(buf, clients[cindex].sock))
-			cindex++;
-		else
-			handle_disconnect(cindex);
+		if(!send_message(buf, clients[i].sock))
+        {
+            std::cout << "errr what \n";
+            handle_disconnect(i);
+        }
 	}
 }
 
@@ -261,17 +261,17 @@ void send_client(int i, std::string buf)
 
 
 // Generate the string to be sent or something
-std::string format_pos_string(int i)
+std::string generate_string_for_clients()
 {
-	std::string str="p";
-	str += itos(i);
-	str += ":";
-	str += ftos(clients[i].x);
-	str += ",";
-	str += ftos(clients[i].y);
-	str += ";";
+    std::ostringstream ret;
 
-	return str;
+    ret << num_clients << ' ';
+    for (int i = 0; i < num_clients; i++)
+    {
+        ret << clients[i].x << ' ' << clients[i].y << ' ' << clients[i].active << ' ';
+	}
+
+    return ret.str();
 }
 
 
@@ -289,20 +289,6 @@ void update_position(int i, std::string message)
 }
 
 
-// Generates the string to be sent to all clients
-std::string calculate_positions()
-{
-	std::string ret;
-	for (int i = 0; i < num_clients; i++)
-    {
-        std::string str = format_pos_string(i);
-        ret += str;
-    }
-
-	return ret;
-}
-
-
 // Point of entry
 int main(int argc, char **argv)
 {
@@ -312,12 +298,11 @@ int main(int argc, char **argv)
 	
 	std::string message;
 	
-	const char *host=NULL;
 	Uint32 ipaddr;
 	Uint16 port;
 	
 	/* check our commandline */
-	if(argc<2)
+	if(argc < 2)
 	{
 		std::cout << argv[0] << "port\n";
 		exit(0);
@@ -352,9 +337,6 @@ int main(int argc, char **argv)
 		exit(3);
 	}
 
-	/* resolve the hostname for the IPaddress */
-	host=SDLNet_ResolveIP(&ip);
-
 	/* open the server socket */
 	server=SDLNet_TCP_Open(&ip);
 	if(!server)
@@ -364,11 +346,6 @@ int main(int argc, char **argv)
 		SDL_Quit();
 		exit(4);
 	}
-
-	std::cout << "Host: " << host << std::endl;
-    std::cout << "IP: " << ipaddr << std::endl;
-	std::cout << "Port: " << port << std::endl;
-
 
 	while(1)
 	{
@@ -382,6 +359,7 @@ int main(int argc, char **argv)
 		}
 		if(numready == 0)
 			continue;
+        
 		if(SDLNet_SocketReady(server))
 		{
 			numready--;
@@ -400,7 +378,6 @@ int main(int argc, char **argv)
 		}
 
 
-        std::string str = "";
 		//---------------------------------------------------------------------
 		// LOOP THROUGH CLIENTS
 		//---------------------------------------------------------------------
@@ -424,12 +401,12 @@ int main(int argc, char **argv)
                     }
                     numready--;
                 }
+                else
+                    handle_disconnect(i);
             }
         }
-        str += calculate_positions();
-        str += "#";
-      
-        send_all(str);
+        
+        send_all(generate_string_for_clients());
 	}
     
 	/* shutdown SDL_net */
@@ -441,3 +418,15 @@ int main(int argc, char **argv)
 	return(0);
 }
 
+/*
+int main()
+{
+    num_clients++;
+    TCPsocket sock;
+    clients.push_back(Client(sock, "Ujjwal", 100, 200, false));
+    //std::cout << "Finding Ujjwal " << find_client_name("Ujjwal") << std::endl;
+    //std::cout << "Is Ujjwal available as a nick? " << is_nick_available("Ujjwal") << std::endl;
+    add_client(sock, "Ujjwal");
+    return 0;
+}
+*/
