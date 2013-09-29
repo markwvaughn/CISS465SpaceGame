@@ -62,7 +62,6 @@ const int MAXLEN = 1024;
 /******************************************************************************
  * Global Variables.
  *****************************************************************************/
-int running=1;
 std::vector<Client> clients;
 int num_clients=0;
 TCPsocket server;
@@ -74,6 +73,8 @@ TCPsocket server;
 void send_client(int, std::string);
 void send_all(std::string buf);
 int find_client_name(std::string name);
+void reconnect(std::string name);//, std::string password)
+void add_client(TCPsocket sock, std::string name);
 
 
 // Converts a float to string
@@ -121,53 +122,6 @@ int send_message(std::string msg, TCPsocket sock)
 }
 
 
-// Check if the desired nickname from the client is available
-bool is_nick_available(std::string s)
-{
-	return(find_client_name(s) == -1);
-}
-
-
-// Add a client to the list of clients
-void add_client(TCPsocket sock, std::string name)
-{
-	if(!name.length())
-	{
-		send_message("Invalid Nickname...bye bye!", sock);
-		SDLNet_TCP_Close(sock);
-		return;
-	}
-	if(!is_nick_available(name))
-	{
-		send_message("Duplicate Nickname...bye bye!", sock);
-		SDLNet_TCP_Close(sock);
-		return;
-	}
-	
-	Client c;
-
-	c.name = name;
-	c.sock = sock;
-	c.x= rand() % W;
-	c.y= rand() % H;
-    c.active = true;
-
-	clients.push_back(c);
-
-	num_clients++;
-
-	std::cout << "inside add client" << std::endl;
-	std::cout << "num clients: " << num_clients << std::endl;
-
-	// Send an acknowledgement
-    std::string player_number = "N";
-	player_number += itos(num_clients - 1);
-	player_number += ";#";
-	// send client their player number
-	send_client(num_clients - 1, player_number);
-}
-
-
 /* find a client in our array of clients by it's socket. */
 /* the socket is always unique */
 int find_client(TCPsocket sock)
@@ -192,6 +146,64 @@ int find_client_name(std::string name)
 }
 
 
+// Handles logging in
+void handle_login(TCPsocket sock, std::string name)
+{
+    if(!name.length())
+	{
+		send_message("Invalid Nickname...bye bye!", sock);
+		SDLNet_TCP_Close(sock);
+		return;
+	}
+
+    int cindex = find_client_name(name);
+
+    if (cindex == -1)
+    {
+        add_client(sock, name);
+        return;
+    }
+    
+    if (clients[cindex].active)
+    {
+        send_message("Duplicate Nickname... bye bye!", sock);
+        SDLNet_TCP_Close(sock);
+        return;
+    }
+
+    clients[cindex].sock = sock;
+    clients[cindex].active = true;
+    return;
+}
+
+
+// Add a client to the list of clients
+void add_client(TCPsocket sock, std::string name)
+{	
+	Client c;
+
+	c.name = name;
+	c.sock = sock;
+	c.x= rand() % W;
+	c.y= rand() % H;
+    c.active = true;
+
+	clients.push_back(c);
+
+	num_clients++;
+
+	std::cout << "inside add client" << std::endl;
+	std::cout << "num clients: " << num_clients << std::endl;
+
+	// Send an acknowledgement
+    std::string player_number = "N";
+	player_number += itos(num_clients - 1);
+	player_number += ";#";
+	// send client their player number
+	send_client(num_clients - 1, player_number);
+}
+
+
 /* closes the socket of a disconnected client */
 void handle_disconnect(int i)
 {
@@ -203,12 +215,15 @@ void handle_disconnect(int i)
 	/* close the old socket, even if it's dead... */
 	SDLNet_TCP_Close(clients[i].sock);
     clients[i].active = false;
+    //std::cout << "Removed client # " << i << std::endl;
+    //std::cin.ignore();
 }
 
 
 /* Reconnects a client */
-void reconnect(std::string name, std::string password)
+void reconnect_client(std::string name)//, std::string password)
 {
+    clients[find_client_name(name)].active = true;
     // pass for now
 }
 
@@ -227,8 +242,9 @@ SDLNet_SocketSet create_sockset()
         return 0;
 	}
 	SDLNet_TCP_AddSocket(set, server);
-	for(int i=0; i<num_clients; i++)
-		SDLNet_TCP_AddSocket(set, clients[i].sock);
+	for(int i=0; i < num_clients; i++)
+        if (clients[i].active)
+            SDLNet_TCP_AddSocket(set, clients[i].sock);
 	return(set);
 }
 
@@ -350,8 +366,11 @@ int main(int argc, char **argv)
 	while(1)
 	{
 		int numready;
+        std::cout << "HERE " << std::endl;
 		set = create_sockset();
-		numready = SDLNet_CheckSockets(set, (Uint32)-1);
+        std::cout << "ALSO HERE " << std::endl;
+		numready = SDLNet_CheckSockets(set, (Uint32)1000);
+        std::cout << "Numready " << numready << std::endl;
 		if(numready == -1)
 		{
 			std::cout << "SDLNet_CheckSockets ERROR" << std::endl;
@@ -371,7 +390,7 @@ int main(int argc, char **argv)
                 
 				name = recv_message(sock);
 
-                add_client(sock,name);
+                handle_login(sock,name);
             }
             else
                 SDLNet_TCP_Close(sock);
@@ -392,17 +411,12 @@ int main(int argc, char **argv)
                     // GET DATA FROM CLIENT
                     //---------------------------------------------------------
                     message = recv_message(clients[i].sock);
-                    //std::cout << "message: " << message << std::endl;
-                    if(message > "")
-                    {					
-                        //std::cout << "<" << clients[i].name << ">" << " " << message << std::endl;
+                    
+                    if(message > "") 
                         update_position(i, message);
-                        
-                    }
+                    
                     numready--;
                 }
-                else
-                    handle_disconnect(i);
             }
         }
         
