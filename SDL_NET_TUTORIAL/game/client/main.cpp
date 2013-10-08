@@ -131,14 +131,8 @@ void Player::draw(Surface & surface)
 
 	Image sprite(sprite_path.c_str());
 	
-	Rect display(W/2, H/2,50, 50);
+	Rect display(x, y,50, 50);
 	Rect source((t/10)*50, 0,50,50);
-	if (player_number != id)
-	{
-		display.x = x;
-		display.y = y;
-	}
-
 	surface.put_image(sprite, source, display);
 
 }
@@ -278,15 +272,11 @@ void recv_player_number(std::string message)
 	}
 
 	player_number = atoi(temp_num.c_str());
-
-	//Player player(player_number, W/2 - 25,H/2 - 25, 50, 50);
-	//players.push_back(player);
 }
 
 void draw_mini_map(Surface & surface)
 {
 	Rect p1_mini_map(W - 50, H - 50, 2, 2);
-
 }
 
 
@@ -374,7 +364,7 @@ int main(int argc, char **argv)
 	
 	recv_player_number(recv_message(sock));
 
-	//std::cout << "player num: " << player_number << std::endl;
+	// std::cout << "player num: " << player_number << std::endl;
 	// std::cout << "players.size() is " << players.size() << std::endl;
 
 	//-------------------------------------------------------------------------
@@ -448,26 +438,24 @@ int main(int argc, char **argv)
 
 		surface.fill(WHITE);
 
-
-
-
 		Rect background_display;
-    	background_display.x = players[player_number].x - W/2 + players[player_number].w/2;
-    	background_display.y = players[player_number].y - H/2 + players[player_number].h/2;
+    	background_display.x = 0;// - W/2 + players[player_number].w/2;
+    	background_display.y = 0;// - H/2 + players[player_number].h/2;
     	background_display.w = W;
     	background_display.h = H;
 
-    	surface.put_image(background_image, background_display, background_source);
+    	surface.put_image(background_image, background_source, background_display);
 
 		for (int i = 0; i < players.size(); i++)
         {
-        	std::cout << i << ' ' << players[i].x << ' ' << players[i].y << std::endl;
+        	//std::cout << i << ' ' << players[i].x << ' ' << players[i].y << std::endl;
 
             if (players[i].state == ACTIVE)
             {
-        		if (players[i].x > background_display.x && players[i].x < background_display.x + background_display.w &&
-           		players[i].y > background_display.y && players[i].y < background_display.y + background_display.h)
-               	{
+        		//if (players[i].x + players[i].w > background_display.x && players[i].x < background_display.x + background_display.w &&
+           		//players[i].y > background_display.y && players[i].y < background_display.y + background_display.h)
+               	//{
+               		if (i != player_number) std::cout << "here" << std::endl;
 	                surface.lock();
 	                if (players[i].bullet->state == ACTIVE)
 	               	{
@@ -475,7 +463,8 @@ int main(int argc, char **argv)
 	               	}
 	               	players[i].draw(surface);
                 	surface.unlock();
-	            }
+	            //}
+	            std::cout << "not here" << std::endl;
             }
         }
 

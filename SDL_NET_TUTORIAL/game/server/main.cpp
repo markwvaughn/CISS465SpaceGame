@@ -42,8 +42,8 @@ const int ACTIVE = 1;
 const int INACTIVE = 0;
 const int MAXLEN = 1024;
 const float PI = 3.14159265;
-const int MAP_X = 5000;
-const int MAP_Y = 5000;
+const int MAP_X = W;//5000;
+const int MAP_Y = H;//5000;
 
 /******************************************************************************
  * Class definitions.
