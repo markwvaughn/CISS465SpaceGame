@@ -91,6 +91,7 @@ public:
 
 };
 
+
 void Bullet::draw(Surface & surface) 
 {
 	if (state == ACTIVE)
@@ -120,6 +121,7 @@ public:
 };
 std::vector<Player> players;
 
+
 void Player::draw(Surface & surface) 
 {
 	if (state != ACTIVE)
@@ -131,11 +133,11 @@ void Player::draw(Surface & surface)
 
 	Image sprite(sprite_path.c_str());
 	
-	Rect display(x, y,50, 50);
-	Rect source((t/10)*50, 0,50,50);
+	Rect display(x, y, 50, 50);
+	Rect source((t/10)*50, 0, 50, 50);
 	surface.put_image(sprite, source, display);
-
 }
+
 
 void Player::draw_bullet(Surface & surface) 
 {
