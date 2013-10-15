@@ -58,9 +58,10 @@ enum GameStates
     GAME_INTRO, // Intro sequence.
     GAME_TITLE, // Splash screen.
     GAME_IDLE, // Player is idling on title screen too long.
-    GAME_REGISTRATION, // User is trying to register for the first time.
+    GAME_REGISTRATION, // User is trying to register. Not used currently.
     GAME_LOGIN_SCREEN, // User is trying to login.
-    GAME_LOGIN_FEEDBACK,
+    GAME_REGISTRATION_FEEDBACK,
+    GAME_LOGIN_FEEDBACK, // Feedback for login
     GAME_RUNNING, // Primary state, game is on.
     GAME_OVER, // Somebody has died too much or whatever other game over seq.
     GAME_DISCONNECT, // Server not found????
@@ -431,13 +432,26 @@ EXIT_TITLE:
 // Gallery images are displayed on IDLE
 void idle(Surface & surface, Event & event, Font & font)
 {
+    static int run_count = 0;
     int bgindex = rand() % 18 + 1;
     
     // Load the fancy background image and set up camera for it.
     Image background = gallery[bgindex];
-    Rect screen = background.getRect();
+    Rect bgrect = background.getRect();
+    Rect screen(0, 0, 1280, 1024);
+    if (bgrect.w >= screen.w)
+        bgrect.x = (bgrect.x + bgrect.w - screen.w) / 2;
+    else
+        screen.x = (screen.x + screen.w - bgrect.w) / 2;
+
+    if (bgrect.h >= screen.h)
+        bgrect.y = (bgrect.y + bgrect.h - screen.h) / 2;
+    else
+        screen.y = (screen.y + screen.h - bgrect.h) / 2;
+    
     SDL_Surface * temp_surface = surface.get();
-    temp_surface = SDL_SetVideoMode(screen.w, screen.h, BPP, SDL_FULLSCREEN);
+    temp_surface = SDL_SetVideoMode(screen.w, screen.h, BPP,
+                                    SDL_ANYFORMAT | SDL_NOFRAME);
     
     int start = getTicks(), current = 0;
     while (1)
@@ -451,38 +465,18 @@ void idle(Surface & surface, Event & event, Font & font)
                     goto EXIT_IDLE;
                 case SDL_KEYDOWN:
                     GameState = GAME_TITLE;
-                    goto EXIT_IDLE;
+                    goto EXIT_IDLE_WITH_RESET;
             }
         }
 
         current = getTicks() - start;
         
-        if (current >= 60000)
+        if (run_count == 10)
         {
             GameState = GAME_INTRO;
             surface.fill(BLACK);
             surface.flip();
             goto EXIT_IDLE_WITH_RESET;
-        }
-        else if (current >= 50000)
-        {
-            GameState = GAME_IDLE;
-            goto EXIT_IDLE;
-        }
-        else if (current >= 40000)
-        {
-            GameState = GAME_IDLE;
-            goto EXIT_IDLE;
-        }
-        else if (current >= 30000)
-        {
-            GameState = GAME_IDLE;
-            goto EXIT_IDLE;
-        }
-        else if (current >= 20000)
-        {
-            GameState = GAME_IDLE;
-            goto EXIT_IDLE;
         }
         else if (current >= 10000)
         {
@@ -491,28 +485,22 @@ void idle(Surface & surface, Event & event, Font & font)
         }
         surface.lock();
         surface.fill(BLACK);
-        surface.put_image(background, screen);
+        surface.put_image(background, bgrect, screen);
         surface.unlock();
         surface.flip();
 		delay(10); // yield 10 milliseconds to other programs
     }
 EXIT_IDLE:
+    run_count++;
     return;
 EXIT_IDLE_WITH_RESET:
+    run_count = 0;
     temp_surface = SDL_SetVideoMode(W, H, BPP, SDL_ANYFORMAT);
     return;
 }
 
 
 // TODO: Write a simple widget class for this kind of stuff.
-
-// Lets the user register.
-void register_screen(Surface & surface, Event & event, Font & font,
-                     std::string & user, std::string & pw)
-{
-    // TODO???
-}
-
 
 // Prompts user for username and password.
 void login_screen(Surface & surface, Event & event, Font & font,
@@ -537,12 +525,28 @@ void login_screen(Surface & surface, Event & event, Font & font,
     prompt_pw_rect.x = prompt_name_rect.x;
     prompt_pw_rect.y = prompt_name_rect.y + H / 10;
 
+    float username_location_x = prompt_name_rect.x + prompt_name_rect.w + W / 40;
+    float username_location_y = prompt_name_rect.y;
+
+    float pw_location_x = prompt_pw_rect.x + prompt_pw_rect.w + W / 40;
+    float pw_location_y = prompt_pw_rect.y;
+    
     TextInput username(font, " ", WHITE,
-                       prompt_name_rect.x + prompt_name_rect.w + W / 40,
-                       prompt_name_rect.y);
+                       username_location_x,
+                       username_location_y);
     TextInput password(font, " ", WHITE,
-                       prompt_pw_rect.x + prompt_pw_rect.w + W / 40,
-                       prompt_pw_rect.y);
+                       pw_location_x,
+                       pw_location_y);
+
+    Image register_button = Image(font.render("Register", CYAN));
+    Rect register_rect = register_button.getRect();
+    register_rect.x = prompt_pw_rect.x;
+    register_rect.y = prompt_pw_rect.y + H / 10;
+
+    Image login_button = Image(font.render("Login", GREEN));
+    Rect login_rect = login_button.getRect();
+    login_rect.x = pw_location_x;
+    login_rect.y = pw_location_y + H / 10;
 
     DynamicText pwlen = password.get_text();
 
@@ -566,6 +570,32 @@ void login_screen(Surface & surface, Event & event, Font & font,
                     else if (password.active())
                         password.handle_input(event, font);
                     break;
+                case SDL_MOUSEBUTTONDOWN:
+                    if (username.active())
+                        break;
+                    else if (event.event.button.button == SDL_BUTTON_LEFT)
+                    {
+                        int x = event.event.button.x;
+                        int y = event.event.button.y;
+
+                        if (x > register_rect.x &&
+                            x < register_rect.x + register_rect.w &&
+                            y > register_rect.y &&
+                            y < register_rect.y + register_rect.h)
+                        {
+                            GameState = GAME_REGISTRATION_FEEDBACK;
+                            goto EXIT_LOGIN_SCREEN;
+                        }
+                        else if (x > login_rect.x &&
+                                 x < login_rect.x + login_rect.w &&
+                                 y > login_rect.y &&
+                                 y < login_rect.y + login_rect.h)
+                        {
+                            GameState = GAME_LOGIN_FEEDBACK;
+                            goto EXIT_LOGIN_SCREEN;
+                        }
+                    }
+                    break;
             }
         }
 
@@ -579,7 +609,11 @@ void login_screen(Surface & surface, Event & event, Font & font,
         surface.put_image(prompt_name, prompt_name_rect);
         surface.put_image(prompt_pw, prompt_pw_rect);
         username.draw(surface);
-        pwlen.draw(surface);    
+        pwlen.draw(surface);
+        surface.put_rect(register_rect, DARKGRAY);
+        surface.put_image(register_button, register_rect);
+        surface.put_rect(login_rect, DARKGRAY);
+        surface.put_image(login_button, login_rect);
         surface.unlock();
         surface.flip();
 		delay(10); // yield 10 milliseconds to other programs
@@ -592,13 +626,70 @@ EXIT_LOGIN_SCREEN:
 }
 
 
+// Feedback on Registration.
+void registration_feedback(Surface & surface, Event & event, Font & font,
+                           std::string & user, std::string & pw)
+{
+    DynamicText welcome(font);
+    
+    std::string message = "$" + user + ':' + pw;
+
+    send_message(message, sock);
+
+    message = recv_message(sock);
+
+    // std::cout << message << std::endl;
+
+    if (message == "Successfully Registered.")
+        welcome.set_color(CYAN);
+    else
+        welcome.set_color(RED);
+    
+    welcome.set_text(font, message);
+    GameState = GAME_LOGIN_SCREEN;
+    
+    welcome.set_x(W / 4);
+    welcome.set_y(H / 3);
+    
+    // Load the fancy background image and set up camera for it.
+    Image background("images/map/bg_feedback.png");
+    SDL_Rect screen = {0, 0, W, H};
+    
+    int start = getTicks(), current = 0;
+    while (1)
+    {
+        if (event.poll() && event.type() == QUIT)
+        {
+            GameState = GAME_EXIT;
+            
+            goto EXIT_REGISTRATION_FEEDBACK;
+        }
+
+        current = getTicks() - start;
+        
+        if (current >= 3000)           
+            goto EXIT_REGISTRATION_FEEDBACK;
+        
+        surface.lock();
+        surface.fill(BLACK);
+        surface.put_image(background, screen);
+        welcome.draw(surface);
+        surface.unlock();
+        surface.flip();
+		delay(10); // yield 10 milliseconds to other programs
+    }
+EXIT_REGISTRATION_FEEDBACK:
+    return;
+}
+
+
 // Feedback on login.
 void login_feedback(Surface & surface, Event & event, Font & font,
                     std::string & user, std::string & pw)
 {
     DynamicText welcome(font);
     
-    std::string message = user + ':' + pw;
+    std::string message = "#" + user + ':' + pw;
 
     send_message(message, sock);
 
@@ -835,6 +926,9 @@ int main(int argc, char* argv[])
                 break;
             case GAME_LOGIN_SCREEN:
                 login_screen(surface, event, font, user, pw);
+                break;
+            case GAME_REGISTRATION_FEEDBACK:
+                registration_feedback(surface, event, font, user, pw);
                 break;
             case GAME_LOGIN_FEEDBACK:
                 login_feedback(surface, event, font, user, pw);

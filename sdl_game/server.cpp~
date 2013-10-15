@@ -137,12 +137,12 @@ int find_client_name(std::string name)
 }
 
 
-// Handles registration
-void handle_registration(TCPsocket sock, std::string username, std::string pw)
+// Handles logging in
+void handle_login(TCPsocket sock, std::string username, std::string pw)
 {
-    if (username.empty() || username == " ")
+    if (!username.length())
 	{
-		send_message("ERROR. Invalid Username.", sock);
+		send_message("Invalid Username...bye bye!", sock);
 		SDLNet_TCP_Close(sock);
         
 		return;
@@ -153,44 +153,13 @@ void handle_registration(TCPsocket sock, std::string username, std::string pw)
     if (cindex == -1)
     {
         add_client(sock, username, pw);
-        send_message("Registration successful.", sock);
-
-        return;
-    }
-    else
-    {
-        send_message("ERROR. User already exists.", sock);
-        SDLNet_TCP_Close(sock);
-        
-        return;
-    }
-}
-
-
-// Handles logging in
-void handle_login(TCPsocket sock, std::string username, std::string pw)
-{
-    if (username.empty() || username == " ")
-	{
-		send_message("ERROR. Invalid Username.", sock);
-		SDLNet_TCP_Close(sock);
-        
-		return;
-	}
-
-    int cindex = find_client_name(username);
-
-    if (cindex == -1)
-    {
-        send_message("ERROR. User not found.", sock);
-        SDLNet_TCP_Close(sock);
         
         return;
     }
     
     else if (clients[cindex].state == ACTIVE)
     {
-        send_message("ERROR. User is active.", sock);
+        send_message("Duplicate Username... bye bye!", sock);
         SDLNet_TCP_Close(sock);
         
         return;
@@ -198,7 +167,7 @@ void handle_login(TCPsocket sock, std::string username, std::string pw)
 
     else if (clients[cindex].pw != pw)
     {
-        send_message("ERROR. Wrong Password.", sock);
+        send_message("Incorrect Username or Password. Bye Bye!", sock);
         SDLNet_TCP_Close(sock);
 
         return;
@@ -229,7 +198,7 @@ void add_client(TCPsocket sock, std::string name, std::string pw)
 	c.w 	= 50;
 	c.h 	= 50;
 	c.t 	= 0;
-    c.state = INACTIVE;
+    c.state = ACTIVE;
 
 	clients.push_back(c);
 
@@ -556,7 +525,7 @@ int main(int argc, char **argv)
                 std::string pw;
                 
                 message = recv_message(sock);
-                
+      
                 int pos = message.find_first_of(':');
                 user = message.substr(0, pos);
                 pw = message.substr(pos + 1);
@@ -564,15 +533,7 @@ int main(int argc, char **argv)
 				std::cout << "name: " << user << std::endl;
                 std::cout << "pw: " << pw << std::endl;
 
-                if (message[0] == '$')
-                    handle_registration(sock, user, pw);
-                else if (message[0] == '#')
-                    handle_login(sock, user, pw);
-                else
-                {
-                    std::cerr << "User data compromised." << std::endl;
-                    exit(5);
-                }
+                handle_login(sock, user, pw);
             }
             else
                 SDLNet_TCP_Close(sock);
