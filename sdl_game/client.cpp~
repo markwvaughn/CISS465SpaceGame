@@ -51,7 +51,7 @@ int player_number = -1;
 
 
 /******************************************************************************
- * Class definitions.
+ * Global Variables.
  *****************************************************************************/
 enum GameStates
 {
@@ -69,17 +69,38 @@ enum GameStates
     GAME_EXIT // Player just quit.
 };
 
+GameStates GameState;
 
+//std::vector<Player> players; // List of players in the game.
+
+std::vector<Image> gallery; // Gallery
+std::vector<Image> ships;
+
+// Network stuff
+IPaddress ip;
+Uint16 port;
+TCPsocket sock;
+int numready;
+SDLNet_SocketSet set;	
+
+// Buffers for communication with server
+std::string to_server;
+std::string from_server;
+
+//SDL_Thread *net_thread=NULL, *local_thread=NULL; Didn't get around to this.
+
+
+/******************************************************************************
+ * Class definitions.
+ *****************************************************************************/
 class Bullet 
 {
-
 public:
 	Bullet();
-	Bullet( int _id, float x1, float y1, float w1 = 3, float h1 = 5,
+	Bullet(int _id, float x1, float y1, float w1 = 3, float h1 = 5,
 			int t1 = 0, int s = INACTIVE)
 		: id(_id), x(x1), y(y1), w(w1), h(h1), t(t1), state(s)
 	{
-	
 	}
 
 	~Bullet();
@@ -103,7 +124,6 @@ void Bullet::draw(Surface & surface)
 
 class Player 
 {
-
 public:
 	Player(	int _id=-1, float x1=-1, float y1=-1, float w1=50, float h1=50,
 		   	int s=ACTIVE, int t1=0)
@@ -111,12 +131,9 @@ public:
           bullet(NULL), state(s), sprite(NULL)
 	{
 		bullet = new Bullet(0, x, y, 3, 3, t);
-        
-        std::string sprite_path = "images/newships/";
-        sprite_path += to_str(id);
-        sprite_path += ".png";
-        
-        sprite = new Image(sprite_path.c_str());
+
+        if (id >= 0)
+            sprite = ships[id];
 	}
 
 	void draw(Surface &);
@@ -147,29 +164,6 @@ void Player::draw_bullet(Surface & surface)
 {
 	bullet->draw(surface);
 }
-
-
-/******************************************************************************
- * Global Variables.
- *****************************************************************************/
-GameStates GameState;
-
-//std::vector<Player> players; // List of players in the game.
-
-std::vector<Image> gallery; // Gallery
-
-// Network stuff
-IPaddress ip;
-Uint16 port;
-TCPsocket sock;
-int numready;
-SDLNet_SocketSet set;	
-
-// Buffers for communication with server
-std::string to_server;
-std::string from_server;
-
-//SDL_Thread *net_thread=NULL, *local_thread=NULL; Didn't get around to this.
 
 
 /******************************************************************************
@@ -863,7 +857,7 @@ void game(Surface & surface, Event & event, Font & font,
     Rect camera = background.getRect();
     camera.w = W;
     camera.h = H;
-    //bool camera_set = false;
+    bool camera_set = false;
 
     SDL_Rect screen = {0, 0, W, H};
     Rect radar(W - 50, 0, 50, 50);
@@ -918,13 +912,13 @@ void game(Surface & surface, Event & event, Font & font,
         send_message(to_server, sock);
 
         // camera stuff
-        //if (!camera_set)
-        //{
+        if (!camera_set)
+        {
             camera.x = players[player_number].x + (players[player_number].w - W) / 2;
             camera.y = players[player_number].y + (players[player_number].h - H) / 2;
-            //}
+        }
         
-            /*if (players[player_number].x <= camera.x)
+        if (players[player_number].x <= camera.x)
             camera.x -= W;
         if (camera.x <= 0)
             camera.x = 0;
@@ -940,7 +934,7 @@ void game(Surface & surface, Event & event, Font & font,
         if (players[player_number].y + players[player_number].h >= camera.y + H)
             camera.y += H;
         if (camera.y + H >= MAP_HEIGHT)
-        camera.y = MAP_HEIGHT - H;*/
+        camera.y = MAP_HEIGHT - H;
 
         std::cout << "Player is at " << players[player_number].x << ", " << players[player_number].y
                   << " while camera is at " << camera.x << ", " << camera.y << std::endl;
@@ -1002,6 +996,13 @@ int main(int argc, char* argv[])
     {
         galpath = "images/gallery/" + to_str(i) + ".jpg";
         gallery.push_back(galpath.c_str());
+    }
+
+    // Load Ship images
+    std::string shippath;
+    for (int i = 1; i < 20; i++)
+    {
+        shippath = 
     }
     
     Surface surface(W, H);	// W = 640, H = 480 are constants. This creates

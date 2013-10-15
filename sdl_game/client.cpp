@@ -105,7 +105,7 @@ public:
 
 	~Bullet();
 
-	void draw(Surface &);
+	void draw(Surface &, const Rect & camera);
 
 	float x, y, w, h;
 	int t;
@@ -115,10 +115,10 @@ public:
 };
 
 
-void Bullet::draw(Surface & surface) 
+void Bullet::draw(Surface & surface, const Rect & camera) 
 {
 	if (state == ACTIVE)
-		surface.put_rect(x, y, w, h, CYAN);
+		surface.put_rect(x - camera.x, y - camera.y, w, h, CYAN);
 }
 
 
@@ -133,11 +133,11 @@ public:
 		bullet = new Bullet(0, x, y, 3, 3, t);
 
         if (id >= 0)
-            sprite = ships[id];
+            sprite = &ships[id];
 	}
 
-	void draw(Surface &);
-	void draw_bullet(Surface &);
+	void draw(Surface &, const Rect & camera);
+	void draw_bullet(Surface &, const Rect & camera);
 
 	float x, y, w, h;
 	int id;
@@ -149,20 +149,20 @@ public:
 std::vector<Player> players;
 
 
-void Player::draw(Surface & surface) 
+void Player::draw(Surface & surface, const Rect & camera) 
 {
 	if (state != ACTIVE)
 		return;
 	
-	Rect display(x, y, 50, 50);
+	Rect display(x - camera.x, y - camera.y, 50, 50);
 	Rect source((t/10)*50, 0, 50, 50);
 	surface.put_image(*sprite, source, display);
 }
 
 
-void Player::draw_bullet(Surface & surface) 
+void Player::draw_bullet(Surface & surface, const Rect & camera) 
 {
-	bullet->draw(surface);
+	bullet->draw(surface, camera);
 }
 
 
@@ -177,33 +177,26 @@ void parse_player_data(std::string message)
     message_stream >> num_players;
 	for (int i = 0; i < num_players; i++)
     {
-    	int 	id  = -1;
-    	float 	x 	= -1;
-		float 	y 	= -1;
-		int 	t 	= -1;
-		int 	s 	= -1;
-		
-		int 	bid = -1;
-    	float	bx 	= -1;
-		float 	by 	= -1;
-		int 	bt 	= -1;
-		int 	bs 	= -1;
+       	//std::cout << "id: " << id << std::endl;
 
-    	message_stream >> id;
-    	message_stream >> x;
-     	message_stream >> y;
-     	message_stream >> t;
-     	message_stream >> s;
-     	message_stream >> bid;
-     	message_stream >> bx;
-     	message_stream >> by;
-     	message_stream >> bt;
-     	message_stream >> bs;
-
-     	//std::cout << "id: " << id << std::endl;
-
- 		if (i >= players.size())
+        if (i < players.size())
+        {
+            message_stream >> players[i].id
+                           >> players[i].x >> players[i].y
+                           >> players[i].t
+                           >> players[i].state
+                           >> players[i].bullet->id >> players[i].bullet->x
+                           >> players[i].bullet->t
+                           >> players[i].bullet->state;
+        }
+ 		else
     	{
+            int id, t, s, bid, bt, bs;
+            float x, y, bx, by;
+
+            message_stream >> id >> x >> y >> t >> s;
+            message_stream >> bid >> bx >> by >> bt >> bs;
+                        
     		//std::cout << "creating player" << std::endl;
     		Player player(id, x, y, 50, 50, t, s);
     		player.bullet->id = bid;
@@ -212,19 +205,6 @@ void parse_player_data(std::string message)
     		player.bullet->t = bt;
     		player.bullet->state = bs;
     		players.push_back(player);
-    	}
-    	else
-    	{
-    		players[i].id = id;
-    		players[i].x = x;
-    		players[i].y = y;
-    		players[i].t = t;
-    		players[i].state = s;
-
-    		players[i].bullet->id = bid;
-    		players[i].bullet->x = bx;
-    		players[i].bullet->t = bt;
-    		players[i].bullet->state = bs;	
     	}
 	}		
 }
@@ -740,7 +720,7 @@ void login_feedback(Surface & surface, Event & event, Font & font,
 
     message = recv_message(sock);
 
-    std::cout << message << std::endl;
+    //std::cout << message << std::endl;
 
     if (message[0] != 'N')
     {
@@ -869,8 +849,11 @@ void game(Surface & surface, Event & event, Font & font,
 
     while (1)
     {
+        // Start the timer to maintain constant FPS.
+        int start = getTicks(), end = 0, dt = 0;
+        
         pack_to_server.reset();
-        numready=SDLNet_CheckSockets(set, 100);
+        numready=SDLNet_CheckSockets(set, (Uint32)1000);
         if(numready == -1)
 		{
 			std::cerr << "SDLNet_CheckSockets ERROR: "
@@ -885,7 +868,7 @@ void game(Surface & surface, Event & event, Font & font,
 		if(numready && SDLNet_SocketReady(sock))
 		{
 			from_server = recv_message(sock);
-            //std::cout << "from_server: " << from_server << std::endl;
+            std::cout << "from_server: " << from_server << std::endl;
 
             // unpack(from_server);
             parse_player_data(from_server);
@@ -946,12 +929,17 @@ void game(Surface & surface, Event & event, Font & font,
                 
         for (int i = 0; i < players.size(); i++)
         {
-            std::cout << "Player and state: " << i << ' ' << players[i].state << std::endl;
+            //std::cout << "Player and state: " << i << ' ' << players[i].state << std::endl;
             if (players[i].state == ACTIVE)
             {
+                // if (players[i].x + players[i].w >= camera.x
+//                     && players[i].x <= camera.x + camera.w
+//                     && players[i].y + players[i].w >= camera.h
+//                     && players[i].y <= camera.y + camera.h)
+                    players[i].draw(surface, camera);
+                
                 if (players[i].bullet->state == ACTIVE)
-                    players[i].draw_bullet(surface);
-                players[i].draw(surface);
+                    players[i].draw_bullet(surface, camera);
                         
                 // Radar
                 radar_blip.x = radar.x + players[i].x / 100;
@@ -964,6 +952,9 @@ void game(Surface & surface, Event & event, Font & font,
         }
         surface.unlock();
         surface.flip();
+        end = getTicks();
+        dt = FPS - end + start;
+        if (dt > 0) delay(dt);
 	}
 EXIT_GAME:
     return;
@@ -1000,9 +991,10 @@ int main(int argc, char* argv[])
 
     // Load Ship images
     std::string shippath;
-    for (int i = 1; i < 20; i++)
+    for (int i = 0; i < 9; i++)
     {
-        shippath = 
+        shippath = "images/new_ships2/" + to_str(i) + ".png";
+        ships.push_back(shippath.c_str());
     }
     
     Surface surface(W, H);	// W = 640, H = 480 are constants. This creates
@@ -1023,8 +1015,6 @@ int main(int argc, char* argv[])
 
     GameState = GAME_INTRO;
 
-    // Start the timer to maintain constant FPS.
-    int start = getTicks(), end = 0, dt = 0;
     while (1)
     {
         switch (GameState)
@@ -1055,9 +1045,6 @@ int main(int argc, char* argv[])
                 break;
         }
     }
-    end = getTicks();
-    dt = FPS - end + start;
-    if (dt > 0) delay(dt);
 EXIT_GAME:
     std::cout << "Bye! " << user << std::endl;
     

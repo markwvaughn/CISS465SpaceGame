@@ -78,7 +78,7 @@ public:
     Client(TCPsocket s=NULL, std::string n="", std::string pw_="",
            int _id = -1,
            float x1=0.0f, float y1=0.0f, float w1 = 50.0f, 
-           float h1 = 50.0f, int t1 = 0, int s1=ACTIVE)
+           float h1 = 50.0f, int t1 = 0, int s1=DISCONNECTED)
         : sock(s), name(n), pw(pw_), id(_id),
         x(x1), y(y1), w(w1), h(h1), state(s1), t(t1)
     {
@@ -193,9 +193,9 @@ void handle_login(TCPsocket sock, std::string username, std::string pw)
         return;
     }
     
-    else if (clients[cindex].state == ACTIVE)
+    else if (clients[cindex].state != DISCONNECTED)
     {
-        send_message("ERROR. User is active.", sock);
+        send_message("ERROR. User is connected.", sock);
         SDLNet_TCP_Close(sock);
         
         return;
@@ -209,12 +209,12 @@ void handle_login(TCPsocket sock, std::string username, std::string pw)
         return;
     }
 
-    else if (clients[cindex].state == DISCONNECTED)
-    {
-        reconnect_client(sock, cindex);
+   //  else if (clients[cindex].state == DISCONNECTED)
+//     {
+//         reconnect_client(sock, cindex);
 
-        return;
-    }
+//         return;
+//     }
 
     else
     {
@@ -239,7 +239,7 @@ void add_client(TCPsocket sock, std::string name, std::string pw)
 	c.w 	= 50;
 	c.h 	= 50;
 	c.t 	= 0;
-    c.state = INACTIVE;
+    c.state = DISCONNECTED;
 
 	clients.push_back(c);
 
@@ -282,23 +282,23 @@ void handle_disconnect(int i)
 }
 
 
-/* Reconnects a client */
-void reconnect_client(TCPsocket sock, int cindex)
-{
-    clients[cindex].sock = sock;
-    clients[cindex].state = ACTIVE;
+// /* Reconnects a client */
+// void reconnect_client(TCPsocket sock, int cindex)
+// {
+//     clients[cindex].sock = sock;
+//     clients[cindex].state = ACTIVE;
     
-    // Send an acknowledgement
-    std::string player_number = "N";
-	player_number += to_str(cindex);
-	player_number += ";#";
+//     // Send an acknowledgement
+//     std::string player_number = "N";
+// 	player_number += to_str(cindex);
+// 	player_number += ";#";
     
-	// send client their player number
-	//std::cout << "player_number: " << player_number << std::endl;
-	send_client(cindex, player_number);
-    //std::cout << "reconnecting client # " << cindex << std::endl;
-    num_clients++;
-}
+// 	// send client their player number
+// 	//std::cout << "player_number: " << player_number << std::endl;
+// 	send_client(cindex, player_number);
+//     //std::cout << "reconnecting client # " << cindex << std::endl;
+//     num_clients++;
+// }
 
 
 /* create a socket set that has the server socket and all the client sockets */
@@ -312,12 +312,13 @@ SDLNet_SocketSet create_sockset()
 	set = SDLNet_AllocSocketSet(num_clients + 1);
 	if(!set)
     {
-        std::cerr << "SDLNet_AllocSocketSet: " << SDLNet_GetError() << std::endl;
+        std::cerr << "SDLNet_AllocSocketSet: "
+                  << SDLNet_GetError() << std::endl;
         return 0;
 	}
 	SDLNet_TCP_AddSocket(set, server);
 	for(int i=0; i < clients.size(); i++)
-        if (clients[i].state == ACTIVE)
+        if (clients[i].state != DISCONNECTED)
             SDLNet_TCP_AddSocket(set, clients[i].sock);
 
     return(set);
@@ -330,9 +331,9 @@ void send_all(std::string buf)
 	if(buf == "" || num_clients == 0)
 		return;
     
-    for (int i = 0; i < num_clients; i++)
+    for (int i = 0; i < clients.size(); i++)
 	{
-        if (clients[i].state == ACTIVE)
+        if (clients[i].state != DISCONNECTED)
             if(!send_message(buf, clients[i].sock))
                 handle_disconnect(i);
 	}
@@ -353,9 +354,10 @@ void send_client(int i, std::string buf)
 std::string generate_string_for_clients()
 {
     std::ostringstream ret;
-
-    ret << num_clients << ' ';
-    for (int i = 0; i < num_clients; i++)
+    int num_players = clients.size();
+    
+    ret << num_players << ' ';
+    for (int i = 0; i < num_players; i++)
     {
         ret << clients[i].id << ' '
         	<< clients[i].x << ' ' 
@@ -368,6 +370,7 @@ std::string generate_string_for_clients()
         	<< clients[i].bullet->t << ' ' 
         	<< clients[i].bullet->state << ' ';
 	}
+    std::cout << "sending to client: " << ret.str() << std::endl;
 
     return ret.str();
 }
@@ -406,7 +409,7 @@ void update_position(int i, std::string message)
 			clients[i].t = 350;
 	}
 
-    if (packed_cdata.test(4))
+    if (packed_cdata.test(4)) // i.e., space
     {
     	clients[i].bullet->t = clients[i].t;
     	clients[i].bullet->state = ACTIVE;
@@ -417,22 +420,26 @@ void update_position(int i, std::string message)
 void bullet_collision_with_wall(int i)
 {
 	// left wall
-	if (clients[i].bullet->x < 0) {
+	if (clients[i].bullet->x <= 0)
+    {
 		clients[i].bullet->state = INACTIVE;
 	}
 
 	// right wall
-	if (clients[i].bullet->x > W) {
+	if (clients[i].bullet->x + clients[i].bullet->w >= MAP_WIDTH)
+    {
 		clients[i].bullet->state = INACTIVE;
 	}
 
 	// top wall
-	if (clients[i].bullet->y < 0) {
+	if (clients[i].bullet->y <= 0)
+    {
 		clients[i].bullet->state = INACTIVE;
 	}
 
 	// bottom wall
-	if (clients[i].bullet->y > H) {
+	if (clients[i].bullet->y + clients[i].bullet->h >= MAP_HEIGHT)
+    {
 		clients[i].bullet->state = INACTIVE;
 	}
 }
@@ -471,10 +478,15 @@ void bullet_collide_with_player(int i)
 	if (clients[i].bullet->state == INACTIVE)
 		return;
 
-	for (int j = 0; j < num_clients; j++)
+	for (int j = 0; j < clients.size(); j++)
 	{
-		if (clients[i].bullet->x > clients[j].x && clients[i].bullet->x < clients[j].x + clients[j].w &&
-			clients[i].bullet->y > clients[j].y && clients[i].bullet->y < clients[j].y + clients[j].h && i != j)
+        if (clients[j].state = INACTIVE)
+            continue;
+		if (clients[i].bullet->x >= clients[j].x
+            && clients[i].bullet->x <= clients[j].x + clients[j].w
+            && clients[i].bullet->y >= clients[j].y
+            && clients[i].bullet->y <= clients[j].y + clients[j].h
+            && i != j)
 		{
 			clients[j].state = INACTIVE;
 			clients[i].bullet->state = INACTIVE;
@@ -487,11 +499,16 @@ void bullet_collide_with_player(int i)
 
 void player_collide_with_player(int i)
 {
-	for (int j = 0; j < num_clients; j++)
+	for (int j = 0; j < clients.size(); j++)
 	{
-		if (clients[i].x > clients[j].x && clients[i].x < clients[j].x + clients[j].w &&
-			clients[i].y > clients[j].y && clients[i].y < clients[j].y + clients[j].h &&
-			clients[i].state == ACTIVE && clients[j].state == ACTIVE)
+        if (clients[j].state = INACTIVE)
+            continue;
+		if (clients[i].x >= clients[j].x
+            && clients[i].x < clients[j].x + clients[j].w
+            && clients[i].y >= clients[j].y
+            && clients[i].y < clients[j].y + clients[j].h
+            && clients[i].state == ACTIVE
+            && clients[j].state == ACTIVE)
 		{
 			clients[i].state = INACTIVE;
 			clients[j].state = INACTIVE;
@@ -590,7 +607,7 @@ int main(int argc, char **argv)
                 std::string pw;
                 
                 message = recv_message(sock);
-                std::cout << "message: " << message << std::endl;
+                //std::cout << "message: " << message << std::endl;
                 
                 char head = message[0];
                 message = message.substr(1);
