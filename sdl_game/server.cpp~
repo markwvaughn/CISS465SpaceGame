@@ -233,7 +233,7 @@ void add_client(TCPsocket sock, std::string name, std::string pw)
 	c.name 	= name;
     c.pw = pw;
 	c.sock 	= sock;
-	c.id   	= clients.size() - 1;
+	c.id   	= clients.size();
 	c.x 	= rand() % MAP_WIDTH;
 	c.y 	= rand() % MAP_HEIGHT;
 	c.w 	= 50;

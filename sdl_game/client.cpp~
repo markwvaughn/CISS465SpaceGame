@@ -265,7 +265,7 @@ void recv_player_number(std::string message)
 	}
 
 	player_number = atoi(temp_num.c_str());
-}
+}    
 
 
 /******************************************************************************
@@ -874,6 +874,10 @@ void game(Surface & surface, Event & event, Font & font,
     // Load the fancy background image and set up camera for it.
     Image background("images/map/bg_game.png");
     Rect camera = background.getRect();
+    camera.x = players[player_number].x + (players[player_number].w - W) / 2;
+    camera.y = players[player_number].y + (players[player_number].h - W) / 2;
+    camera.w = W;
+    camera.h = H;
     SDL_Rect screen = {0, 0, W, H};
     Rect radar(W - 50, 0, 50, 50);
     Rect radar_blip;
@@ -900,7 +904,7 @@ void game(Surface & surface, Event & event, Font & font,
 		if(numready && SDLNet_SocketReady(sock))
 		{
 			from_server = recv_message(sock);
-            //std::cout << from_server << std::endl;
+            std::cout << "from_server: " << from_server << std::endl;
 
             // unpack(from_server);
             parse_player_data(from_server);
@@ -926,36 +930,39 @@ void game(Surface & surface, Event & event, Font & font,
         // send to server
         send_message(to_server, sock);
 
-        for (int i = 0; i < players.size(); i++)
-        {
-        	//std::cout << i << ' ' << players[i].x << ' ' << players[i].y << std::endl;
-
-            if (players[i].state == ACTIVE)
-            {
-        		//if (players[i].x + players[i].w > background_display.x && players[i].x < background_display.x + background_display.w &&
-           		//players[i].y > background_display.y && players[i].y < background_display.y + background_display.h)
-               	//{
-               		if (i != player_number) std::cout << "here" << std::endl;
-	                surface.lock();
-	                if (players[i].bullet->state == ACTIVE)
-	               	{
-	               		players[i].draw_bullet(surface);
-	               	}
-	               	players[i].draw(surface);
-                	surface.unlock();
-	            //}
-	            std::cout << "not here" << std::endl;
-            }
-        }
-
+        // camera stuff
+        if (players[player_number].x <= camera.x)
+            camera.x -= W;
+        if (camera.x <= 0)
+            camera.x = 0;
+        if (players[player_number].x + players[player_number].w >= camera.x + W)
+            camera.x += W;
+        if (camera.x + W >= MAP_WIDTH)
+            camera.x = MAP_WIDTH - W;
+        
+        if (players[player_number].y <= camera.y)
+            camera.x -= H;
+        if (camera.x <= 0)
+            camera.x = 0;
+        if (players[player_number].y + players[player_number].h >= camera.y + H)
+            camera.x += H;
+        if (camera.x + H >= MAP_HEIGHT)
+            camera.x = MAP_HEIGHT - H;
 
         surface.lock();
         surface.fill(BLACK);
         surface.put_image(background, camera, screen);
         surface.put_rect(radar, CYAN);
-
+                
         for (int i = 0; i < players.size(); i++)
         {
+            if (players[i].state == ACTIVE)
+            {
+                if (players[i].bullet->state == ACTIVE)
+                    players[i].draw_bullet(surface);
+                players[i].draw(surface);
+            }
+            
             // Radar
             radar_blip.x = radar.x + players[i].x / 100;
             radar_blip.y = radar.y + players[i].y / 100;

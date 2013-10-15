@@ -243,7 +243,7 @@ void add_client(TCPsocket sock, std::string name, std::string pw)
 
 	clients.push_back(c);
 
-	num_clients++;
+	//num_clients++;
     
 // 	std::cout << "inside add client" << std::endl;
 // 	std::cout << "num clients: " << num_clients << std::endl;
@@ -263,6 +263,7 @@ void login_client(TCPsocket sock, int cindex)
 	// send client their player number
 	//std::cout << "player_number: " << player_number << std::endl;
 	send_client(cindex, player_number);
+    num_clients++;
 }
 
 
@@ -284,9 +285,18 @@ void handle_disconnect(int i)
 /* Reconnects a client */
 void reconnect_client(TCPsocket sock, int cindex)
 {
-    std::cout << "reconnecting client # " << cindex << std::endl;
     clients[cindex].sock = sock;
     clients[cindex].state = ACTIVE;
+    
+    // Send an acknowledgement
+    std::string player_number = "N";
+	player_number += to_str(cindex);
+	player_number += ";#";
+    
+	// send client their player number
+	//std::cout << "player_number: " << player_number << std::endl;
+	send_client(cindex, player_number);
+    //std::cout << "reconnecting client # " << cindex << std::endl;
     num_clients++;
 }
 
@@ -322,8 +332,9 @@ void send_all(std::string buf)
     
     for (int i = 0; i < num_clients; i++)
 	{
-		if(!send_message(buf, clients[i].sock))
-            handle_disconnect(i);
+        if (clients[i].state == ACTIVE)
+            if(!send_message(buf, clients[i].sock))
+                handle_disconnect(i);
 	}
 }
 
@@ -349,15 +360,11 @@ std::string generate_string_for_clients()
         ret << clients[i].id << ' '
         	<< clients[i].x << ' ' 
         	<< clients[i].y << ' ' 
-        	<< clients[i].w << ' '
-        	<< clients[i].h << ' ' 
         	<< clients[i].t << ' ' 
         	<< clients[i].state << ' '
         	<< clients[i].bullet->id << ' '
         	<< clients[i].bullet->x << ' ' 
-        	<< clients[i].bullet->y << ' ' 
-        	<< clients[i].bullet->w << ' '
-        	<< clients[i].bullet->h << ' ' 
+        	<< clients[i].bullet->y << ' '
         	<< clients[i].bullet->t << ' ' 
         	<< clients[i].bullet->state << ' ';
 	}

@@ -75,7 +75,7 @@ class Bullet
 
 public:
 	Bullet();
-	Bullet( int _id, float x1, float y1, float w1 = 3, float h1 = 3,
+	Bullet( int _id, float x1, float y1, float w1 = 3, float h1 = 5,
 			int t1 = 0, int s = INACTIVE)
 		: id(_id), x(x1), y(y1), w(w1), h(h1), t(t1), state(s)
 	{
@@ -97,7 +97,7 @@ public:
 void Bullet::draw(Surface & surface) 
 {
 	if (state == ACTIVE)
-		surface.put_rect(x, y, w, h, 255, 0, 0);
+		surface.put_rect(x, y, w, h, CYAN);
 }
 
 
@@ -105,11 +105,18 @@ class Player
 {
 
 public:
-	Player(	int _id, float x1, float y1, float w1, float h1,
-		   	int s = ACTIVE, int t1 = 0)
-		: id(_id), x(x1), y(y1), w(w1), h(h1), t(t1), state(s)
+	Player(	int _id=-1, float x1=-1, float y1=-1, float w1=50, float h1=50,
+		   	int s=ACTIVE, int t1=0)
+		: id(_id), x(x1), y(y1), w(w1), h(h1), t(t1),
+          bullet(NULL), state(s), sprite(NULL)
 	{
 		bullet = new Bullet(0, x, y, 3, 3, t);
+        
+        std::string sprite_path = "images/newships/";
+        sprite_path += to_str(id);
+        sprite_path += ".png";
+        
+        sprite = new Image(sprite_path.c_str());
 	}
 
 	void draw(Surface &);
@@ -120,6 +127,7 @@ public:
 	int t;
 	Bullet * bullet;
 	int state;
+    Image * sprite;
 };
 std::vector<Player> players;
 
@@ -128,16 +136,10 @@ void Player::draw(Surface & surface)
 {
 	if (state != ACTIVE)
 		return;
-
-	std::string sprite_path = "images/newships/";
-	sprite_path += to_str(id);
-	sprite_path += ".png";
-
-	Image sprite(sprite_path.c_str());
 	
 	Rect display(x, y, 50, 50);
 	Rect source((t/10)*50, 0, 50, 50);
-	surface.put_image(sprite, source, display);
+	surface.put_image(*sprite, source, display);
 }
 
 
@@ -184,31 +186,23 @@ void parse_player_data(std::string message)
     	int 	id  = -1;
     	float 	x 	= -1;
 		float 	y 	= -1;
-		float 	w 	= -1;
-		float 	h 	= -1;
 		int 	t 	= -1;
 		int 	s 	= -1;
 		
 		int 	bid = -1;
     	float	bx 	= -1;
 		float 	by 	= -1;
-		float 	bw 	= -1;
-		float	bh 	= -1;
 		int 	bt 	= -1;
 		int 	bs 	= -1;
 
     	message_stream >> id;
     	message_stream >> x;
      	message_stream >> y;
-     	message_stream >> w;
-     	message_stream >> h;
      	message_stream >> t;
      	message_stream >> s;
      	message_stream >> bid;
      	message_stream >> bx;
      	message_stream >> by;
-     	message_stream >> bw;
-     	message_stream >> bh;
      	message_stream >> bt;
      	message_stream >> bs;
 
@@ -217,12 +211,10 @@ void parse_player_data(std::string message)
  		if (i >= players.size())
     	{
     		//std::cout << "creating player" << std::endl;
-    		Player player(id, x, y, w, h, t, s);
+    		Player player(id, x, y, 50, 50, t, s);
     		player.bullet->id = bid;
     		player.bullet->x = bx;
     		player.bullet->y = by;
-    		player.bullet->w = bw;
-    		player.bullet->h = bh;
     		player.bullet->t = bt;
     		player.bullet->state = bs;
     		players.push_back(player);
@@ -232,16 +224,11 @@ void parse_player_data(std::string message)
     		players[i].id = id;
     		players[i].x = x;
     		players[i].y = y;
-    		players[i].w = w;
-    		players[i].h = h;
     		players[i].t = t;
     		players[i].state = s;
 
     		players[i].bullet->id = bid;
     		players[i].bullet->x = bx;
-    		players[i].bullet->y = by;
-    		players[i].bullet->w = bw;
-    		players[i].bullet->h = bh;
     		players[i].bullet->t = bt;
     		players[i].bullet->state = bs;	
     	}
@@ -276,7 +263,7 @@ void recv_player_number(std::string message)
 void intro(Surface & surface, Event & event, Font & font)
 {
     // This text can be modified, serves only to present a message for now.
-    DynamicText welcome(font, "Mark and Ujjwal present ...", GREEN);
+    DynamicText welcome(font, "Group 2 presents ...", GREEN);
 
     // Load the fancy background iamge and set up camera for it.
     Image background("images/map/bg_intro.png");
@@ -874,10 +861,10 @@ void game(Surface & surface, Event & event, Font & font,
     // Load the fancy background image and set up camera for it.
     Image background("images/map/bg_game.png");
     Rect camera = background.getRect();
-    camera.x = players[player_number].x + (players[player_number].w - W) / 2;
-    camera.y = players[player_number].y + (players[player_number].h - W) / 2;
     camera.w = W;
     camera.h = H;
+    //bool camera_set = false;
+
     SDL_Rect screen = {0, 0, W, H};
     Rect radar(W - 50, 0, 50, 50);
     Rect radar_blip;
@@ -904,7 +891,7 @@ void game(Surface & surface, Event & event, Font & font,
 		if(numready && SDLNet_SocketReady(sock))
 		{
 			from_server = recv_message(sock);
-            std::cout << "from_server: " << from_server << std::endl;
+            //std::cout << "from_server: " << from_server << std::endl;
 
             // unpack(from_server);
             parse_player_data(from_server);
@@ -931,7 +918,13 @@ void game(Surface & surface, Event & event, Font & font,
         send_message(to_server, sock);
 
         // camera stuff
-        if (players[player_number].x <= camera.x)
+        //if (!camera_set)
+        //{
+            camera.x = players[player_number].x + (players[player_number].w - W) / 2;
+            camera.y = players[player_number].y + (players[player_number].h - H) / 2;
+            //}
+        
+            /*if (players[player_number].x <= camera.x)
             camera.x -= W;
         if (camera.x <= 0)
             camera.x = 0;
@@ -941,35 +934,39 @@ void game(Surface & surface, Event & event, Font & font,
             camera.x = MAP_WIDTH - W;
         
         if (players[player_number].y <= camera.y)
-            camera.x -= H;
-        if (camera.x <= 0)
-            camera.x = 0;
+            camera.y -= H;
+        if (camera.y <= 0)
+            camera.y = 0;
         if (players[player_number].y + players[player_number].h >= camera.y + H)
-            camera.x += H;
-        if (camera.x + H >= MAP_HEIGHT)
-            camera.x = MAP_HEIGHT - H;
+            camera.y += H;
+        if (camera.y + H >= MAP_HEIGHT)
+        camera.y = MAP_HEIGHT - H;*/
+
+        std::cout << "Player is at " << players[player_number].x << ", " << players[player_number].y
+                  << " while camera is at " << camera.x << ", " << camera.y << std::endl;
 
         surface.lock();
         surface.fill(BLACK);
         surface.put_image(background, camera, screen);
-        surface.put_rect(radar, CYAN);
+        surface.put_rect(radar, GRAY);
                 
         for (int i = 0; i < players.size(); i++)
         {
+            std::cout << "Player and state: " << i << ' ' << players[i].state << std::endl;
             if (players[i].state == ACTIVE)
             {
                 if (players[i].bullet->state == ACTIVE)
                     players[i].draw_bullet(surface);
                 players[i].draw(surface);
+                        
+                // Radar
+                radar_blip.x = radar.x + players[i].x / 100;
+                radar_blip.y = radar.y + players[i].y / 100;
+                if (players[i].id == player_number)
+                    surface.put_rect(radar_blip, GREEN);
+                else
+                    surface.put_rect(radar_blip, RED);
             }
-            
-            // Radar
-            radar_blip.x = radar.x + players[i].x / 100;
-            radar_blip.y = radar.y + players[i].y / 100;
-            if (players[i].id == player_number)
-                surface.put_rect(radar_blip, GREEN);
-			else
-                surface.put_rect(radar_blip, RED);
         }
         surface.unlock();
         surface.flip();
