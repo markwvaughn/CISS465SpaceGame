@@ -57,13 +57,14 @@ enum GameStates
     GAME_NULL, // Nothing. Keep the current state. Actually not used right now.
     GAME_INTRO, // Intro sequence.
     GAME_TITLE, // Splash screen.
+    GAME_IDLE, // Player is idling on title screen too long.
     GAME_REGISTRATION, // User is trying to register for the first time.
     GAME_LOGIN_SCREEN, // User is trying to login.
     GAME_LOGIN_FEEDBACK,
     GAME_RUNNING, // Primary state, game is on.
     GAME_OVER, // Somebody has died too much or whatever other game over seq.
     GAME_DISCONNECT, // Server not found????
-    GAME_EXIT // Nothing, Player just quit.
+    GAME_EXIT // Player just quit.
 };
 
 
@@ -148,6 +149,8 @@ void Player::draw_bullet(Surface & surface)
  * Global Variables.
  *****************************************************************************/
 GameStates GameState;
+
+std::vector<Image> gallery; // Gallery
 
 // Network stuff
 IPaddress ip;
@@ -265,10 +268,10 @@ void recv_player_number(std::string message)
 void intro(Surface & surface, Event & event, Font & font)
 {
     // This text can be modified, serves only to present a message for now.
-    DynamicText welcome(font, "Ujjwal and Mark present ...", GREEN);
+    DynamicText welcome(font, "Mark and Ujjwal present ...", GREEN);
 
     // Load the fancy background iamge and set up camera for it.
-    Image background("images/map/spacebg-01.png");
+    Image background("images/map/bg_intro.png");
     Rect camera = background.getRect();
     SDL_Rect screen = {0, 0, W, H};
 
@@ -378,36 +381,36 @@ void title(Surface & surface, Event & event, Font & font)
         
         if (current >= 10000)
         {
-            GameState = GAME_INTRO;
+            GameState = GAME_IDLE;
             surface.fill(BLACK);
             surface.flip();
             goto EXIT_TITLE;
         }
         else if (current >= 8000)
         {
-            welcome.set_text(font, prompt_str);
             welcome.set_color(RED);
+            welcome.set_text(font, prompt_str);
         }
         else if (current >= 7000)
             welcome.set_text(font, " ");
         else if (current >= 6000)
         {
-            welcome.set_text(font, prompt_str);
             welcome.set_color(ORANGE);
+            welcome.set_text(font, prompt_str);
         }
         else if (current >= 5000)
             welcome.set_text(font, " ");
         else if (current >= 4000)
         {
-            welcome.set_text(font, prompt_str);
             welcome.set_color(GREEN);
+            welcome.set_text(font, prompt_str);
         }
         else if (current >= 3000)
             welcome.set_text(font, " ");
         else if (current >= 2000)
         {
-            welcome.set_text(font, prompt_str);
             welcome.set_color(BLUE);
+            welcome.set_text(font, prompt_str);
         }
         else if (current >= 1000)
             welcome.set_text(font, " ");
@@ -421,6 +424,82 @@ void title(Surface & surface, Event & event, Font & font)
 		delay(10); // yield 10 milliseconds to other programs
     }
 EXIT_TITLE:
+    return;
+}
+
+
+// Gallery images are displayed on IDLE
+void idle(Surface & surface, Event & event, Font & font)
+{
+    int bgindex = rand() % 18 + 1;
+    
+    // Load the fancy background image and set up camera for it.
+    Image background = gallery[bgindex];
+    Rect screen = background.getRect();
+    SDL_Surface * temp_surface = surface.get();
+    temp_surface = SDL_SetVideoMode(screen.w, screen.h, BPP, SDL_FULLSCREEN);
+    
+    int start = getTicks(), current = 0;
+    while (1)
+    {
+        if (event.poll())
+        {
+            switch (event.type())
+            {
+                case QUIT:
+                    GameState = GAME_EXIT;
+                    goto EXIT_IDLE;
+                case SDL_KEYDOWN:
+                    GameState = GAME_TITLE;
+                    goto EXIT_IDLE;
+            }
+        }
+
+        current = getTicks() - start;
+        
+        if (current >= 60000)
+        {
+            GameState = GAME_INTRO;
+            surface.fill(BLACK);
+            surface.flip();
+            goto EXIT_IDLE_WITH_RESET;
+        }
+        else if (current >= 50000)
+        {
+            GameState = GAME_IDLE;
+            goto EXIT_IDLE;
+        }
+        else if (current >= 40000)
+        {
+            GameState = GAME_IDLE;
+            goto EXIT_IDLE;
+        }
+        else if (current >= 30000)
+        {
+            GameState = GAME_IDLE;
+            goto EXIT_IDLE;
+        }
+        else if (current >= 20000)
+        {
+            GameState = GAME_IDLE;
+            goto EXIT_IDLE;
+        }
+        else if (current >= 10000)
+        {
+            GameState = GAME_IDLE;
+            goto EXIT_IDLE;
+        }
+        surface.lock();
+        surface.fill(BLACK);
+        surface.put_image(background, screen);
+        surface.unlock();
+        surface.flip();
+		delay(10); // yield 10 milliseconds to other programs
+    }
+EXIT_IDLE:
+    return;
+EXIT_IDLE_WITH_RESET:
+    temp_surface = SDL_SetVideoMode(W, H, BPP, SDL_ANYFORMAT);
     return;
 }
 
@@ -439,6 +518,10 @@ void register_screen(Surface & surface, Event & event, Font & font,
 void login_screen(Surface & surface, Event & event, Font & font,
                   std::string & user, std::string & pw)
 {
+    // Load the fancy background image and set up camera for it.
+    Image background("images/map/bg_login.jpg");
+    SDL_Rect screen = {0, 0, W, H};
+    
     Image welcome(font.render("Welcome to Space Shootout.", BLUE));
     Rect welcome_rect = welcome.getRect();
     welcome_rect.x = W / 10;
@@ -459,7 +542,9 @@ void login_screen(Surface & surface, Event & event, Font & font,
                        prompt_name_rect.y);
     TextInput password(font, " ", WHITE,
                        prompt_pw_rect.x + prompt_pw_rect.w + W / 40,
-                       prompt_pw_rect.y);                       
+                       prompt_pw_rect.y);
+
+    DynamicText pwlen = password.get_text();
 
     while (1)
 	{
@@ -483,14 +568,18 @@ void login_screen(Surface & surface, Event & event, Font & font,
                     break;
             }
         }
-        
+
+        pw = password.get_text().get_text();
+        pw == " " ? pw : pw.replace(pw.begin(), pw.end(), pw.length(), '*');
+        pwlen.set_text(font, pw);
         surface.lock();
         surface.fill(BLACK);
+        surface.put_image(background, screen);
         surface.put_image(welcome, welcome_rect);
         surface.put_image(prompt_name, prompt_name_rect);
         surface.put_image(prompt_pw, prompt_pw_rect);
         username.draw(surface);
-        password.draw(surface);    
+        pwlen.draw(surface);    
         surface.unlock();
         surface.flip();
 		delay(10); // yield 10 milliseconds to other programs
@@ -519,24 +608,24 @@ void login_feedback(Surface & surface, Event & event, Font & font,
 
     if (message[0] != 'N')
     {
-        welcome.set_text(font, message);
         welcome.set_color(RED);
+        welcome.set_text(font, message);
         GameState = GAME_LOGIN_SCREEN;
     }
     else
     {
     	recv_player_number(message);
-        message = "Logged in as " + player_number;
-        welcome.set_text(font, message);
+        message = "Logged in as player # " + to_str(player_number);
         welcome.set_color(CYAN);
+        welcome.set_text(font, message);
         GameState = GAME_RUNNING;
     }
    
-    welcome.set_x(W / 3);
+    welcome.set_x(W / 4);
     welcome.set_y(H / 3);
     
     // Load the fancy background image and set up camera for it.
-    Image background("images/map/bgfeedback.jpg");
+    Image background("images/map/bg_feedback.png");
     SDL_Rect screen = {0, 0, W, H};
     
     int start = getTicks(), current = 0;
@@ -551,7 +640,7 @@ void login_feedback(Surface & surface, Event & event, Font & font,
 
         current = getTicks() - start;
         
-        if (current >= 5000)           
+        if (current >= 3000)           
             goto EXIT_LOGIN_FEEDBACK;
         
         surface.lock();
@@ -699,9 +788,19 @@ int main(int argc, char* argv[])
     const char * hostaddr = argv[1];
     
     init(hostaddr);
+
+    // Load Gallery images
+    std::string galpath; 
+    for (int i = 1; i < 19; i++)
+    {
+        galpath = "images/gallery/" + to_str(i) + ".jpg";
+        gallery.push_back(galpath.c_str());
+    }
     
     Surface surface(W, H);	// W = 640, H = 480 are constants. This creates
                             // a drawing surface of size W-by-H
+
+    SDL_WM_SetCaption("Space Shootout", NULL);
 
 	Event event; // event is an Event object. It's used to process user
                  // events such as mouse clicks, key presses, etc.
@@ -730,6 +829,9 @@ int main(int argc, char* argv[])
             case GAME_TITLE:
                 title(surface, event, title_font);
                 delay(1000);
+                break;
+            case GAME_IDLE:
+                idle(surface, event, font);
                 break;
             case GAME_LOGIN_SCREEN:
                 login_screen(surface, event, font, user, pw);

@@ -503,6 +503,7 @@ EXIT_LOGIN_SCREEN:
 }
 
 
+// Feedback on login.
 void login_feedback(Surface & surface, Event & event, Font & font,
                     std::string & user, std::string & pw)
 {
@@ -527,7 +528,7 @@ void login_feedback(Surface & surface, Event & event, Font & font,
     	recv_player_number(message);
         message = "Logged in as " + player_number;
         welcome.set_text(font, message);
-        welcome.set_color(GREEN);
+        welcome.set_color(CYAN);
         GameState = GAME_RUNNING;
     }
    
