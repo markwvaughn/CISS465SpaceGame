@@ -27,7 +27,7 @@ This header file also contains some useful inline functions derived from SDL.
 #include "TextInput.h"
 #include "Misc.h"
 #include "Network.h"
-//#include "GameObjects.h"
+#include "GameObjects.h"
 
 inline int getTicks()
 {

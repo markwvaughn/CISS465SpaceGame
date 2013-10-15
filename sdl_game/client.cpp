@@ -17,6 +17,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <bitset>
 
 // SDL wrapper from Dr. Liow
 #include "Includes.h"
@@ -151,6 +152,8 @@ void Player::draw_bullet(Surface & surface)
  *****************************************************************************/
 GameStates GameState;
 
+//std::vector<Player> players; // List of players in the game.
+
 std::vector<Image> gallery; // Gallery
 
 // Network stuff
@@ -160,7 +163,11 @@ TCPsocket sock;
 int numready;
 SDLNet_SocketSet set;	
 
-//SDL_Thread *net_thread=NULL, *local_thread=NULL;
+// Buffers for communication with server
+std::string to_server;
+std::string from_server;
+
+//SDL_Thread *net_thread=NULL, *local_thread=NULL; Didn't get around to this.
 
 
 /******************************************************************************
@@ -258,7 +265,7 @@ void recv_player_number(std::string message)
 	}
 
 	player_number = atoi(temp_num.c_str());
-}
+}    
 
 
 /******************************************************************************
@@ -630,6 +637,30 @@ EXIT_LOGIN_SCREEN:
 void registration_feedback(Surface & surface, Event & event, Font & font,
                            std::string & user, std::string & pw)
 {
+    /* open the server socket */
+	sock=SDLNet_TCP_Open(&ip);
+	if(!sock)
+	{
+		std::cerr << "SDLNet_TCP_Open ERROR: "
+                  << SDLNet_GetError() << std::endl;
+
+        SDLNet_Quit();
+		SDL_Quit();
+
+        exit(4);
+	}
+	
+	if(SDLNet_TCP_AddSocket(set, sock) == -1)
+	{
+		std::cerr << "SDLNet_TCP_AddSocket ERROR: "
+                  << SDLNet_GetError() << std::endl;
+
+		SDLNet_Quit();
+		SDL_Quit();
+
+        exit(5);
+	}
+
     DynamicText welcome(font);
     
     std::string message = "$" + user + ':' + pw;
@@ -640,7 +671,7 @@ void registration_feedback(Surface & surface, Event & event, Font & font,
 
     // std::cout << message << std::endl;
 
-    if (message == "Successfully Registered.")
+    if (message == "Registration successful.")
         welcome.set_color(CYAN);
     else
         welcome.set_color(RED);
@@ -679,6 +710,16 @@ void registration_feedback(Surface & surface, Event & event, Font & font,
 		delay(10); // yield 10 milliseconds to other programs
     }
 EXIT_REGISTRATION_FEEDBACK:
+    if (SDLNet_TCP_DelSocket(set, sock) == -1)
+    {
+        std::cerr << "SDLNet_DelSocket error: "
+                  << SDLNet_GetError() << std::endl;
+
+        exit (-1);
+    }
+
+    SDLNet_TCP_Close(sock);
+    
     return;
 }
 
@@ -687,6 +728,29 @@ EXIT_REGISTRATION_FEEDBACK:
 void login_feedback(Surface & surface, Event & event, Font & font,
                     std::string & user, std::string & pw)
 {
+    sock = SDLNet_TCP_Open(&ip);
+    if(!sock)
+	{
+		std::cerr << "SDLNet_TCP_Open ERROR: "
+                  << SDLNet_GetError() << std::endl;
+
+        SDLNet_Quit();
+		SDL_Quit();
+
+        exit(-1);
+	}
+
+    if(SDLNet_TCP_AddSocket(set, sock) == -1)
+	{
+		std::cerr << "SDLNet_TCP_AddSocket ERROR: "
+                  << SDLNet_GetError() << std::endl;
+
+		SDLNet_Quit();
+		SDL_Quit();
+
+        exit(-2);
+	}
+
     DynamicText welcome(font);
     
     std::string message = "#" + user + ':' + pw;
@@ -699,6 +763,15 @@ void login_feedback(Surface & surface, Event & event, Font & font,
 
     if (message[0] != 'N')
     {
+        if (SDLNet_TCP_DelSocket(set, sock) == -1)
+        {
+            std::cerr << "SDLNet_DelSocket error: "
+                      << SDLNet_GetError() << std::endl;
+            
+        exit (-1);
+        }
+        SDLNet_TCP_Close(sock);
+        
         welcome.set_color(RED);
         welcome.set_text(font, message);
         GameState = GAME_LOGIN_SCREEN;
@@ -749,11 +822,7 @@ EXIT_LOGIN_FEEDBACK:
 
 void init(const char * hostaddr)
 {
-    // Buffers for communication with server
-	static std::string to_server;
-	static std::string from_server;
-
-	/* initialize SDL */
+    /* initialize SDL */
     if (SDL_Init(SDL_INIT_EVERYTHING) == -1)
     {
         std::cerr << "SDL_Init ERROR: " << SDL_GetError() << std:: endl;
@@ -795,30 +864,6 @@ void init(const char * hostaddr)
 
         exit(3);
 	}
-
-	/* open the server socket */
-	sock=SDLNet_TCP_Open(&ip);
-	if(!sock)
-	{
-		std::cerr << "SDLNet_TCP_Open ERROR: "
-                  << SDLNet_GetError() << std::endl;
-
-        SDLNet_Quit();
-		SDL_Quit();
-
-        exit(4);
-	}
-	
-	if(SDLNet_TCP_AddSocket(set, sock) == -1)
-	{
-		std::cerr << "SDLNet_TCP_AddSocket ERROR: "
-                  << SDLNet_GetError() << std::endl;
-
-		SDLNet_Quit();
-		SDL_Quit();
-
-        exit(5);
-	}
 }
 
 
@@ -826,36 +871,110 @@ void init(const char * hostaddr)
 void game(Surface & surface, Event & event, Font & font,
           const std::string &user)
 {
-    std::string greeting = "Hello " + user + ", welcome!";
-    Image * welcome = new Image(font.render(greeting.c_str(), GREEN));
-    Rect welcome_rect = welcome->getRect();
-    welcome_rect.x = W / 10;
-    welcome_rect.y = H / 5;
+    // Load the fancy background image and set up camera for it.
+    Image background("images/map/bg_game.png");
+    Rect camera = background.getRect();
+    camera.x = players[player_number].x + (players[player_number].w - W) / 2;
+    camera.y = players[player_number].y + (players[player_number].h - W) / 2;
+    camera.w = W;
+    camera.h = H;
+    SDL_Rect screen = {0, 0, W, H};
+    Rect radar(W - 50, 0, 50, 50);
+    Rect radar_blip;
+    radar_blip.w = 5;
+    radar_blip.h = 5;
+
+    std::bitset<5> pack_to_server;
 
     while (1)
-	{
-        if (event.poll())
+    {
+        pack_to_server.reset();
+        numready=SDLNet_CheckSockets(set, 100);
+        if(numready == -1)
+		{
+			std::cerr << "SDLNet_CheckSockets ERROR: "
+                      << SDLNet_GetError() << std::endl;
+			break;
+		}
+
+        //-------------------------------------------------------------------------------
+		// GET DATA FROM SERVER
+		//-------------------------------------------------------------------------------
+		from_server = "";
+		if(numready && SDLNet_SocketReady(sock))
+		{
+			from_server = recv_message(sock);
+            std::cout << "from_server: " << from_server << std::endl;
+
+            // unpack(from_server);
+            parse_player_data(from_server);
+		}
+
+		if (event.poll() && event.type() == QUIT)
         {
-            switch(event.type())
-            {
-                case QUIT:
-                    GameState = GAME_EXIT;
-                    goto EXIT_GREET;
-                case SDL_KEYDOWN:
-                    delete welcome;
-                    welcome = new Image(font.render("Lolpls", BLUE));
-            }
+            GameState = GAME_EXIT;
+            goto EXIT_GAME;
         }
+
+        // Get keypresses and pack into a string to be sent to server.
+        KeyPressed keypressed = get_keypressed();
         
+        keypressed[UPARROW] ? pack_to_server.set(0) : pack_to_server;
+        keypressed[DOWNARROW] ? pack_to_server.set(1) : pack_to_server;
+        keypressed[LEFTARROW] ? pack_to_server.set(2) : pack_to_server;
+        keypressed[RIGHTARROW] ? pack_to_server.set(3) : pack_to_server;
+        keypressed[SPACE] ? pack_to_server.set(4) : pack_to_server;
+
+        to_server = to_str(pack_to_server.to_ulong());
+
+        // send to server
+        send_message(to_server, sock);
+
+        // camera stuff
+        if (players[player_number].x <= camera.x)
+            camera.x -= W;
+        if (camera.x <= 0)
+            camera.x = 0;
+        if (players[player_number].x + players[player_number].w >= camera.x + W)
+            camera.x += W;
+        if (camera.x + W >= MAP_WIDTH)
+            camera.x = MAP_WIDTH - W;
+        
+        if (players[player_number].y <= camera.y)
+            camera.x -= H;
+        if (camera.x <= 0)
+            camera.x = 0;
+        if (players[player_number].y + players[player_number].h >= camera.y + H)
+            camera.x += H;
+        if (camera.x + H >= MAP_HEIGHT)
+            camera.x = MAP_HEIGHT - H;
+
         surface.lock();
         surface.fill(BLACK);
-        surface.put_image(*welcome, welcome_rect);
+        surface.put_image(background, camera, screen);
+        surface.put_rect(radar, CYAN);
+                
+        for (int i = 0; i < players.size(); i++)
+        {
+            if (players[i].state == ACTIVE)
+            {
+                if (players[i].bullet->state == ACTIVE)
+                    players[i].draw_bullet(surface);
+                players[i].draw(surface);
+            }
+            
+            // Radar
+            radar_blip.x = radar.x + players[i].x / 100;
+            radar_blip.y = radar.y + players[i].y / 100;
+            if (players[i].id == player_number)
+                surface.put_rect(radar_blip, GREEN);
+			else
+                surface.put_rect(radar_blip, RED);
+        }
         surface.unlock();
         surface.flip();
-		delay(10); // yield 10 milliseconds to other programs
 	}
-EXIT_GREET:
-    
+EXIT_GAME:
     return;
 }
 
@@ -942,7 +1061,7 @@ int main(int argc, char* argv[])
     dt = FPS - end + start;
     if (dt > 0) delay(dt);
 EXIT_GAME:
-    std::cout << "Bye! " << user << " with pw: " << pw << std::endl;
+    std::cout << "Bye! " << user << std::endl;
     
 	return 0;	
 }

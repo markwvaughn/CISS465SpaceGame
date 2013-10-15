@@ -17,6 +17,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <bitset>
 
 // SDL wrapper from Dr. Liow
 #include "Includes.h"
@@ -46,6 +47,7 @@ const int MAP_WIDTH = 5000;
 const int MAP_HEIGHT = 5000;
 const int ACTIVE = 1;
 const int INACTIVE = 0;
+const int DISCONNECTED = -1;
 int player_number = -1;
 
 
@@ -59,8 +61,7 @@ public:
 	Bullet();
 	Bullet(int _id, float x1, float y1, float w1 = 3, float h1 = 3, int t1 = 0, int s = INACTIVE)
 		: id(_id), x(x1), y(y1), w(w1), h(h1), t(t1), state(s)
-	{
-	
+	{	
 	}
 
 	~Bullet();
@@ -109,6 +110,7 @@ TCPsocket server;
 void send_client(int, std::string);
 void send_all(std::string buf);
 int find_client_name(std::string name);
+void login_client(TCPsocket sock, int cindex);
 void reconnect_client(TCPsocket sock, int cindex);
 void add_client(TCPsocket sock, std::string name, std::string pw);
 
@@ -117,7 +119,7 @@ void add_client(TCPsocket sock, std::string name, std::string pw);
 /* the socket is always unique */
 int find_client(TCPsocket sock)
 {
-	for(int i = 0; i < num_clients; i++)
+	for(int i = 0; i < clients.size(); i++)
 		if(clients[i].sock == sock)
 			return(i);
 
@@ -129,7 +131,7 @@ int find_client(TCPsocket sock)
 /* the name is always unique */
 int find_client_name(std::string name)
 {
-	for(int i=0; i < num_clients;i++)
+	for(int i = 0; i < clients.size(); i++)
 		if (clients[i].name == name)
 			return i;
 		
@@ -140,13 +142,14 @@ int find_client_name(std::string name)
 // Handles registration
 void handle_registration(TCPsocket sock, std::string username, std::string pw)
 {
-    if (username.empty() || username == " ")
-	{
-		send_message("ERROR. Invalid Username.", sock);
-		SDLNet_TCP_Close(sock);
+// Taken care of on the client side
+// if (username.empty() || username == " ")
+// 	{
+// 		send_message("ERROR. Invalid Username.", sock);
+// 		SDLNet_TCP_Close(sock);
         
-		return;
-	}
+// 		return;
+// 	}
 
     int cindex = find_client_name(username);
 
@@ -154,7 +157,8 @@ void handle_registration(TCPsocket sock, std::string username, std::string pw)
     {
         add_client(sock, username, pw);
         send_message("Registration successful.", sock);
-
+        SDLNet_TCP_Close(sock);
+        
         return;
     }
     else
@@ -170,13 +174,14 @@ void handle_registration(TCPsocket sock, std::string username, std::string pw)
 // Handles logging in
 void handle_login(TCPsocket sock, std::string username, std::string pw)
 {
-    if (username.empty() || username == " ")
-	{
-		send_message("ERROR. Invalid Username.", sock);
-		SDLNet_TCP_Close(sock);
+// Taken care of on the client side
+// if (username.empty() || username == " ")
+// 	{
+// 		send_message("ERROR. Invalid Username.", sock);
+// 		SDLNet_TCP_Close(sock);
         
-		return;
-	}
+// 		return;
+// 	}
 
     int cindex = find_client_name(username);
 
@@ -204,11 +209,16 @@ void handle_login(TCPsocket sock, std::string username, std::string pw)
         return;
     }
 
-    else
+    else if (clients[cindex].state == DISCONNECTED)
     {
         reconnect_client(sock, cindex);
 
         return;
+    }
+
+    else
+    {
+        login_client(sock, cindex);
     }
 
     return;
@@ -223,7 +233,7 @@ void add_client(TCPsocket sock, std::string name, std::string pw)
 	c.name 	= name;
     c.pw = pw;
 	c.sock 	= sock;
-	c.id   	= num_clients;
+	c.id   	= clients.size();
 	c.x 	= rand() % MAP_WIDTH;
 	c.y 	= rand() % MAP_HEIGHT;
 	c.w 	= 50;
@@ -234,18 +244,25 @@ void add_client(TCPsocket sock, std::string name, std::string pw)
 	clients.push_back(c);
 
 	num_clients++;
-
+    
 // 	std::cout << "inside add client" << std::endl;
 // 	std::cout << "num clients: " << num_clients << std::endl;
+}
 
-	// Send an acknowledgement
+
+void login_client(TCPsocket sock, int cindex)
+{
+    clients[cindex].sock = sock;
+    clients[cindex].state = ACTIVE;
+    
+    // Send an acknowledgement
     std::string player_number = "N";
-	player_number += to_str(num_clients - 1);
+	player_number += to_str(cindex);
 	player_number += ";#";
     
 	// send client their player number
 	//std::cout << "player_number: " << player_number << std::endl;
-	send_client(num_clients - 1, player_number);
+	send_client(cindex, player_number);
 }
 
 
@@ -257,7 +274,7 @@ void handle_disconnect(int i)
 	
 	/* close the old socket, even if it's dead... */
 	SDLNet_TCP_Close(clients[i].sock);
-    clients[i].state = INACTIVE;
+    clients[i].state = DISCONNECTED;
     num_clients--;
     //std::cout << "Removed client # " << i << std::endl;
     //std::cin.ignore();
@@ -267,6 +284,7 @@ void handle_disconnect(int i)
 /* Reconnects a client */
 void reconnect_client(TCPsocket sock, int cindex)
 {
+    std::cout << "reconnecting client # " << cindex << std::endl;
     clients[cindex].sock = sock;
     clients[cindex].state = ACTIVE;
     num_clients++;
@@ -351,32 +369,40 @@ std::string generate_string_for_clients()
 // Update the position of a client
 void update_position(int i, std::string message)
 {
-	float x_pos = 10 * cos((PI*(clients[i].t + 90)) / 180);
-	float y_pos = 10 * sin((PI*(clients[i].t + 90)) / 180);
+	float dx = 10 * cos((PI*(clients[i].t + 90)) / 180);
+	float dy = 10 * sin((PI*(clients[i].t + 90)) / 180);
 
-	if (message == "1") 
+    std::bitset<5> packed_cdata(strtoul(message.c_str(), NULL, 0));
+    
+	if (packed_cdata.test(0)) // i.e., uparrow
 	{
-		clients[i].y -= y_pos;
-		clients[i].x += x_pos;		
+		clients[i].y -= dy;
+		clients[i].x += dx;		
 	}
-	else if (message == "2")
+
+    if (packed_cdata.test(1)) // i.e., downarrow, do nothing for now
 	{
+	}
+
+    if (packed_cdata.test(2)) // i.e., leftarrow
+    {
 		clients[i].t += 10;
 
 		if (clients[i].t > 350)
 			clients[i].t = 0;
-	}
-	else if (message == "3")
+    }
+    
+	if (packed_cdata.test(3)) // i.e., rightarrow
 	{
 	   	clients[i].t -= 10;
 	   	if (clients[i].t < 0)
 			clients[i].t = 350;
 	}
-    else if (message == "4")
+
+    if (packed_cdata.test(4))
     {
     	clients[i].bullet->t = clients[i].t;
     	clients[i].bullet->state = ACTIVE;
-    	//std::cout << "bullet active" << std::endl;
     }
 }
 
@@ -408,25 +434,25 @@ void bullet_collision_with_wall(int i)
 void player_collide_map_bounds(int i)
 {
 	// left wall
-	if (clients[i].x < 0)
+	if (clients[i].x <= 0)
     {
 		clients[i].x = 0;
 	}
 
 	// right wall
-	if (clients[i].x + clients[i].w > MAP_WIDTH)
+	if (clients[i].x + clients[i].w >= MAP_WIDTH)
     {
 		clients[i].x = MAP_WIDTH - clients[i].w;
 	}
 
 	// top wall
-	if (clients[i].y < 0)
+	if (clients[i].y <= 0)
     {
 		clients[i].y = 0;
 	}
 
 	// bottom wall
-	if (clients[i].y + clients[i].h > MAP_HEIGHT)
+	if (clients[i].y + clients[i].h >= MAP_HEIGHT)
     {
 		clients[i].y = MAP_HEIGHT - clients[i].h;
 	}
@@ -547,6 +573,7 @@ int main(int argc, char **argv)
         
 		if (SDLNet_SocketReady(server))
 		{
+            std::cout << "Accepting new connection." << std::endl;
 			numready--;
 
 			sock=SDLNet_TCP_Accept(server);
@@ -556,6 +583,10 @@ int main(int argc, char **argv)
                 std::string pw;
                 
                 message = recv_message(sock);
+                std::cout << "message: " << message << std::endl;
+                
+                char head = message[0];
+                message = message.substr(1);
                 
                 int pos = message.find_first_of(':');
                 user = message.substr(0, pos);
@@ -564,9 +595,9 @@ int main(int argc, char **argv)
 				std::cout << "name: " << user << std::endl;
                 std::cout << "pw: " << pw << std::endl;
 
-                if (message[0] == '$')
+                if (head == '$')
                     handle_registration(sock, user, pw);
-                else if (message[0] == '#')
+                else if (head == '#')
                     handle_login(sock, user, pw);
                 else
                 {
@@ -601,11 +632,11 @@ int main(int argc, char **argv)
 			}
 			else if (clients[i].bullet->state == ACTIVE)
             {
-				float x_pos = 5 * cos((PI*(clients[i].bullet->t + 90)) / 180);
-				float y_pos = 5 * sin((PI*(clients[i].bullet->t + 90)) / 180);
+				float dx = 5 * cos((PI*(clients[i].bullet->t + 90)) / 180);
+				float dy = 5 * sin((PI*(clients[i].bullet->t + 90)) / 180);
 
-				clients[i].bullet->x += x_pos;
-				clients[i].bullet->y -= y_pos;
+				clients[i].bullet->x += dx;
+				clients[i].bullet->y -= dy;
 			}
 
 			message = "";
@@ -617,7 +648,7 @@ int main(int argc, char **argv)
                     // GET DATA FROM CLIENT
                     //---------------------------------------------------------
                     message = recv_message(clients[i].sock);
-                    
+                    std::cout << "Message from client: " << message << std::endl;
                     if (message > "") 
                         update_position(i, message);
                     

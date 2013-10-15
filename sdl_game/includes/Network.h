@@ -1,6 +1,8 @@
 #ifndef NETWORK_H
 #define NETWORK_H
 
+#include "SDL_net.h"
+
 const int MAXLEN = 1024;
 
 // Receive a string over TCP/IP
