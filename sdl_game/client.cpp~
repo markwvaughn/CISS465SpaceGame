@@ -117,8 +117,7 @@ public:
 
 void Bullet::draw(Surface & surface, const Rect & camera) 
 {
-	if (state == ACTIVE)
-		surface.put_rect(x - camera.x, y - camera.y, w, h, CYAN);
+    surface.put_rect(x - camera.x, y - camera.y, w, h, CYAN);
 }
 
 
@@ -150,10 +149,7 @@ std::vector<Player> players;
 
 
 void Player::draw(Surface & surface, const Rect & camera) 
-{
-	if (state != ACTIVE)
-		return;
-	
+{	
 	Rect display(x - camera.x, y - camera.y, 50, 50);
 	Rect source((t/10)*50, 0, 50, 50);
 	surface.put_image(*sprite, source, display);
@@ -899,6 +895,8 @@ void game(Surface & surface, Event & event, Font & font,
         {
             camera.x = players[player_number].x + (players[player_number].w - W) / 2;
             camera.y = players[player_number].y + (players[player_number].h - H) / 2;
+
+            camera_set = true;
         }
         
         if (players[player_number].x <= camera.x)
@@ -917,7 +915,7 @@ void game(Surface & surface, Event & event, Font & font,
         if (players[player_number].y + players[player_number].h >= camera.y + H)
             camera.y += H;
         if (camera.y + H >= MAP_HEIGHT)
-        camera.y = MAP_HEIGHT - H;
+            camera.y = MAP_HEIGHT - H;
 
         std::cout << "Player is at " << players[player_number].x << ", " << players[player_number].y
                   << " while camera is at " << camera.x << ", " << camera.y << std::endl;
@@ -932,14 +930,12 @@ void game(Surface & surface, Event & event, Font & font,
             //std::cout << "Player and state: " << i << ' ' << players[i].state << std::endl;
             if (players[i].state == ACTIVE)
             {
-                // if (players[i].x + players[i].w >= camera.x
-//                     && players[i].x <= camera.x + camera.w
-//                     && players[i].y + players[i].w >= camera.h
-//                     && players[i].y <= camera.y + camera.h)
+            /*if (players[i].x > camera.x
+                    && players[i].x < camera.x + camera.w
+                    && players[i].y > camera.y
+                    && players[i].y < camera.y + camera.h
+                    )*/
                     players[i].draw(surface, camera);
-                
-                if (players[i].bullet->state == ACTIVE)
-                    players[i].draw_bullet(surface, camera);
                         
                 // Radar
                 radar_blip.x = radar.x + players[i].x / 100;
@@ -949,6 +945,8 @@ void game(Surface & surface, Event & event, Font & font,
                 else
                     surface.put_rect(radar_blip, RED);
             }
+            if (players[i].bullet->state == ACTIVE)
+                players[i].draw_bullet(surface, camera);
         }
         surface.unlock();
         surface.flip();

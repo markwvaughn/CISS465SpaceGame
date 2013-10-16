@@ -379,6 +379,9 @@ std::string generate_string_for_clients()
 // Update the position of a client
 void update_position(int i, std::string message)
 {
+    if (clients[i].state != ACTIVE)
+        return;
+    
 	float dx = 10 * cos((PI*(clients[i].t + 90)) / 180);
 	float dy = 10 * sin((PI*(clients[i].t + 90)) / 180);
 
@@ -474,19 +477,15 @@ void player_collide_map_bounds(int i)
 
 void bullet_collide_with_player(int i)
 {
-
-	if (clients[i].bullet->state == INACTIVE)
-		return;
-
 	for (int j = 0; j < clients.size(); j++)
 	{
-        if (clients[j].state = INACTIVE)
+        if (clients[j].state != ACTIVE || i == j)
             continue;
-		if (clients[i].bullet->x >= clients[j].x
-            && clients[i].bullet->x <= clients[j].x + clients[j].w
-            && clients[i].bullet->y >= clients[j].y
-            && clients[i].bullet->y <= clients[j].y + clients[j].h
-            && i != j)
+		if (clients[i].bullet->x > clients[j].x
+            && clients[i].bullet->x < clients[j].x + clients[j].w
+            && clients[i].bullet->y > clients[j].y
+            && clients[i].bullet->y < clients[j].y + clients[j].h
+            )
 		{
 			clients[j].state = INACTIVE;
 			clients[i].bullet->state = INACTIVE;
@@ -501,7 +500,7 @@ void player_collide_with_player(int i)
 {
 	for (int j = 0; j < clients.size(); j++)
 	{
-        if (clients[j].state == INACTIVE)
+        if (clients[j].state != ACTIVE || i == j)
             continue;
 		if (clients[i].x >= clients[j].x
             && clients[i].x <= clients[j].x + clients[j].w

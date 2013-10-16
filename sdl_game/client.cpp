@@ -97,9 +97,9 @@ class Bullet
 {
 public:
 	Bullet();
-	Bullet(int _id, float x1, float y1, float w1 = 3, float h1 = 5,
-			int t1 = 0, int s = INACTIVE)
-		: id(_id), x(x1), y(y1), w(w1), h(h1), t(t1), state(s)
+	Bullet(float x1, float y1, int t1=0,
+           float w1=3, float h1=5, int s=INACTIVE)
+		: x(x1), y(y1), t(t1), w(w1), h(h1), state(s)
 	{
 	}
 
@@ -107,9 +107,9 @@ public:
 
 	void draw(Surface &, const Rect & camera);
 
-	float x, y, w, h;
+	float x, y;
 	int t;
-	int id;
+    float w, h;
 	int state;
 
 };
@@ -124,23 +124,23 @@ void Bullet::draw(Surface & surface, const Rect & camera)
 class Player 
 {
 public:
-	Player(	int _id=-1, float x1=-1, float y1=-1, float w1=50, float h1=50,
-		   	int s=ACTIVE, int t1=0)
-		: id(_id), x(x1), y(y1), w(w1), h(h1), t(t1),
+	Player(float x1=-1, float y1=-1, int t1=0,
+           float w1=50, float h1=50,
+           int s=ACTIVE, int id=-1)
+		: x(x1), y(y1), t(t1), w(w1), h(h1), 
           bullet(NULL), state(s), sprite(NULL)
 	{
-		bullet = new Bullet(0, x, y, 3, 3, t);
+		bullet = new Bullet(x, y, t);
 
-        if (id >= 0)
-            sprite = &ships[id];
+        sprite = &ships[id];
 	}
 
 	void draw(Surface &, const Rect & camera);
 	void draw_bullet(Surface &, const Rect & camera);
 
-	float x, y, w, h;
-	int id;
-	int t;
+	float x, y;
+    int t;
+    float w, h;
 	Bullet * bullet;
 	int state;
     Image * sprite;
@@ -177,25 +177,25 @@ void parse_player_data(std::string message)
 
         if (i < players.size())
         {
-            message_stream >> players[i].id
-                           >> players[i].x >> players[i].y
+            message_stream >> players[i].x
+                           >> players[i].y
                            >> players[i].t
                            >> players[i].state
-                           >> players[i].bullet->id >> players[i].bullet->x
+                           >> players[i].bullet->x
+                           >> players[i].bullet->y
                            >> players[i].bullet->t
                            >> players[i].bullet->state;
         }
  		else
     	{
-            int id, t, s, bid, bt, bs;
+            int t, s, bt, bs;
             float x, y, bx, by;
 
-            message_stream >> id >> x >> y >> t >> s;
-            message_stream >> bid >> bx >> by >> bt >> bs;
+            message_stream >> x >> y >> t >> s;
+            message_stream >> bx >> by >> bt >> bs;
                         
     		//std::cout << "creating player" << std::endl;
-    		Player player(id, x, y, 50, 50, t, s);
-    		player.bullet->id = bid;
+    		Player player(x, y, t, 50, 50, s, i);
     		player.bullet->x = bx;
     		player.bullet->y = by;
     		player.bullet->t = bt;
@@ -836,10 +836,11 @@ void game(Surface & surface, Event & event, Font & font,
     bool camera_set = false;
 
     SDL_Rect screen = {0, 0, W, H};
-    Rect radar(W - 50, 0, 50, 50);
     Rect radar_blip;
     radar_blip.w = 5;
     radar_blip.h = 5;
+    Rect radar(W - 50 - radar_blip.w, 0, 50 + radar_blip.w, 50 + radar_blip.h);
+
 
     std::bitset<5> pack_to_server;
 
@@ -938,12 +939,12 @@ void game(Surface & surface, Event & event, Font & font,
                     players[i].draw(surface, camera);
                         
                 // Radar
-                radar_blip.x = radar.x + players[i].x / 100;
-                radar_blip.y = radar.y + players[i].y / 100;
-                if (players[i].id == player_number)
-                    surface.put_rect(radar_blip, GREEN);
-                else
-                    surface.put_rect(radar_blip, RED);
+                    radar_blip.x = radar.x + players[i].x / 100;
+                    radar_blip.y = radar.y + players[i].y / 100;
+                    if (i == player_number)
+                        surface.put_rect(radar_blip, GREEN);
+                    else
+                        surface.put_rect(radar_blip, RED);
             }
             if (players[i].bullet->state == ACTIVE)
                 players[i].draw_bullet(surface, camera);
