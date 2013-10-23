@@ -528,7 +528,7 @@ int main(int argc, char **argv)
 	/* check our commandline */
 	if(argc < 2)
 	{
-		std::cout << argv[0] << "port\n";
+		std::cout << "Usage: " << argv[0] << " port\n";
 		exit(0);
 	}
 	
@@ -577,16 +577,15 @@ int main(int argc, char **argv)
 
 		set = create_sockset();
 
-		numready = SDLNet_CheckSockets(set, (Uint32)1000);
+		numready = SDLNet_CheckSockets(set, (Uint32)10000);
+        std::cout << "numready: " << numready << std::endl;
 
 		if (numready == -1)
 		{
 			std::cerr << "SDLNet_CheckSockets ERROR: "
                       << SDLNet_GetError() << std::endl;
 			break;
-		}
-		if (numready == 0)
-			continue;
+		}		
         
 		if (SDLNet_SocketReady(server))
 		{
@@ -672,7 +671,7 @@ int main(int argc, char **argv)
                     // GET DATA FROM CLIENT
                     //---------------------------------------------------------
                     message = recv_message(clients[i].sock);
-                    std::cout << "Message from client: " << message << std::endl;
+                    //std::cout << "Message from client: " << message << std::endl;
                     if (message > "") 
                         update_position(i, message);
                     

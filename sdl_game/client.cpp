@@ -98,7 +98,7 @@ class Bullet
 public:
 	Bullet();
 	Bullet(float x1, float y1, int t1=0,
-           float w1=3, float h1=5, int s=INACTIVE)
+           float w1=4, float h1=4, int s=INACTIVE)
 		: x(x1), y(y1), t(t1), w(w1), h(h1), state(s)
 	{
 	}
@@ -655,7 +655,7 @@ void registration_feedback(Surface & surface, Event & event, Font & font,
 
         current = getTicks() - start;
         
-        if (current >= 3000)           
+        if (current >= 1000)
             goto EXIT_REGISTRATION_FEEDBACK;
         
         surface.lock();
@@ -761,7 +761,7 @@ void login_feedback(Surface & surface, Event & event, Font & font,
 
         current = getTicks() - start;
         
-        if (current >= 3000)           
+        if (current >= 1000)
             goto EXIT_LOGIN_FEEDBACK;
         
         surface.lock();
@@ -848,9 +848,14 @@ void game(Surface & surface, Event & event, Font & font,
     {
         // Start the timer to maintain constant FPS.
         int start = getTicks(), end = 0, dt = 0;
+
+        if (event.poll() && event.type() == QUIT)
+        {
+            GameState = GAME_EXIT;
+            goto EXIT_GAME;
+        }
         
-        pack_to_server.reset();
-        numready=SDLNet_CheckSockets(set, (Uint32)1000);
+        numready=SDLNet_CheckSockets(set, (Uint32)10);
         if(numready == -1)
 		{
 			std::cerr << "SDLNet_CheckSockets ERROR: "
@@ -870,26 +875,6 @@ void game(Surface & surface, Event & event, Font & font,
             // unpack(from_server);
             parse_player_data(from_server);
 		}
-
-		if (event.poll() && event.type() == QUIT)
-        {
-            GameState = GAME_EXIT;
-            goto EXIT_GAME;
-        }
-
-        // Get keypresses and pack into a string to be sent to server.
-        KeyPressed keypressed = get_keypressed();
-        
-        keypressed[UPARROW] ? pack_to_server.set(0) : pack_to_server;
-        keypressed[DOWNARROW] ? pack_to_server.set(1) : pack_to_server;
-        keypressed[LEFTARROW] ? pack_to_server.set(2) : pack_to_server;
-        keypressed[RIGHTARROW] ? pack_to_server.set(3) : pack_to_server;
-        keypressed[SPACE] ? pack_to_server.set(4) : pack_to_server;
-
-        to_server = to_str(pack_to_server.to_ulong());
-
-        // send to server
-        send_message(to_server, sock);
 
         // camera stuff
         if (!camera_set)
@@ -918,8 +903,8 @@ void game(Surface & surface, Event & event, Font & font,
         if (camera.y + H >= MAP_HEIGHT)
             camera.y = MAP_HEIGHT - H;
 
-        std::cout << "Player is at " << players[player_number].x << ", " << players[player_number].y
-                  << " while camera is at " << camera.x << ", " << camera.y << std::endl;
+        //std::cout << "Player is at " << players[player_number].x << ", " << players[player_number].y
+        //        << " while camera is at " << camera.x << ", " << camera.y << std::endl;
 
         surface.lock();
         surface.fill(BLACK);
@@ -951,6 +936,26 @@ void game(Surface & surface, Event & event, Font & font,
         }
         surface.unlock();
         surface.flip();
+
+        
+        // Get keypresses and pack into a string to be sent to server.
+        pack_to_server.reset();
+        KeyPressed keypressed = get_keypressed();
+        
+        keypressed[UPARROW] ? pack_to_server.set(0) : pack_to_server;
+        keypressed[DOWNARROW] ? pack_to_server.set(1) : pack_to_server;
+        keypressed[LEFTARROW] ? pack_to_server.set(2) : pack_to_server;
+        keypressed[RIGHTARROW] ? pack_to_server.set(3) : pack_to_server;
+        keypressed[SPACE] ? pack_to_server.set(4) : pack_to_server;
+        
+        to_server = to_str(pack_to_server.to_ulong());
+
+        // send to server
+        if (to_server == "0")
+            to_server = "";
+        if (!to_server.empty())
+            send_message(to_server, sock);
+                
         end = getTicks();
         dt = FPS - end + start;
         if (dt > 0) delay(dt);
