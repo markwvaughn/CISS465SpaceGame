@@ -24,7 +24,7 @@ int main(int argc, char **argv)
     // Resolve the ip for the server (i.e., localhost on the same machine)
     // Server's ip is used here because we want to be the client.
     // Essentially, this creates a sender on port 1234
-	SDLNet_ResolveHost(&ip, "bilbo.ccis.edu", 1234);
+	SDLNet_ResolveHost(&ip, "127.0.0.1", 1234);
 
 	// Create Server Socket (TCP) to connect to server
 	TCPsocket server = SDLNet_TCP_Open(&ip);
