@@ -577,16 +577,15 @@ int main(int argc, char **argv)
 
 		set = create_sockset();
 
-		numready = SDLNet_CheckSockets(set, (Uint32)-1);
+		numready = SDLNet_CheckSockets(set, (Uint32)10000);
+        std::cout << "numready: " << numready << std::endl;
 
 		if (numready == -1)
 		{
 			std::cerr << "SDLNet_CheckSockets ERROR: "
                       << SDLNet_GetError() << std::endl;
 			break;
-		}
-		if (numready == 0)
-			continue;
+		}		
         
 		if (SDLNet_SocketReady(server))
 		{

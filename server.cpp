@@ -577,7 +577,7 @@ int main(int argc, char **argv)
 
 		set = create_sockset();
 
-		numready = SDLNet_CheckSockets(set, (Uint32)10000);
+		numready = SDLNet_CheckSockets(set, (Uint32)100);
         std::cout << "numready: " << numready << std::endl;
 
 		if (numready == -1)
@@ -629,7 +629,7 @@ int main(int argc, char **argv)
 		//---------------------------------------------------------------------
 		// LOOP THROUGH CLIENTS
 		//---------------------------------------------------------------------
-		for (int i = 0; numready > 0 && i < clients.size(); i++)
+		for (int i = 0; i < clients.size(); i++)
 		{
 			// collisions
             if (clients[i].bullet->state == ACTIVE)
